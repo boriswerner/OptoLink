@@ -164,14 +164,10 @@ Zusätzlich zu den Datenpunkten gibt es `optolink/error` (`0`/`1`, siehe [Verbin
 | `KesselIstTemp` | 0x0802 | DPTemp | temp | Kesseltemperatur Sensor 3 |
 | `WarmwasserIstTemp` | 0x0804 | DPTemp | temp | Warmwasser-Ist |
 | `AbgasTempOderRuecklauf` | 0x0808 | DPTemp | temp | Abgas- oder Rücklauftemperatur (unsicher) |
-| `rücklauftemperatur17A` | 0x080A | DPTemp | global | Rücklauftemperatur (17A) |
-| `vorlauftemperatur` | 0x080C | DPTemp | global | Vorlauftemperatur (17B) |
 | `boilerTemp` | 0x0810 | DPTemp | temp | Kesseltemperatur Tiefpass |
 | `LadespeicherObenTemp` | 0x0812 | DPTemp | temp | Speicher oben |
 | `LadespeicherUntenTemp` | 0x0814 | DPTemp | temp | Speicher unten |
 | `abgastemperaturTiefpass` | 0x0816 | DPTemp | temp | Abgastemperatur Tiefpass |
-| `x0818` | 0x0818 | DPTemp | global | Rücklauftemperatur Tiefpass? (unbekannt) |
-| `heizkreisRaumtemperatur` | 0x0896 | DPTemp | global | Raumtemperatur A1M1 Tiefpass |
 | `raumtemperaturSoll` | 0x2306 | DPTempS | global | Raumtemperatur-Soll normal |
 | `redRaumtemperaturSoll` | 0x2307 | DPTempS | global | Raumtemperatur-Soll reduziert |
 | `partyTemperaturSoll` | 0x2308 | DPTempS | global | Party-Temperatur-Soll |
@@ -184,25 +180,20 @@ Zusätzlich zu den Datenpunkten gibt es `optolink/error` (`0`/`1`, siehe [Verbin
 | `heizkennlinieNiveau` | 0x27D4 | DPMode | global | Niveau der Heizkennlinie |
 | `x2900` | 0x2900 | DPTemp | global | Vorlauftemperatur-Ist? (unbekannt) |
 | `a1m1Pump` | 0x2906 | DPStat | global | Heizkreispumpe A1M1 |
-| `Sparbetrieb` | 0x3302 | DPMode | global | Sparbetrieb |
 | `Betriebsart` | 0x3323 | DPMode | global | Betriebsart |
-| `VorlaufSollTemp` | 0x3544 | DPTemp | global | Vorlauf-Soll (zweiter Heizkreis?) |
-| `VorlaufIstTemp` | 0x3900 | DPTemp | global | Vorlauf-Ist (zweiter Heizkreis?) |
 | `aussenTemperaturTiefpass` | 0x5525 | DPTemp | temp | Außentemperatur Tiefpass |
 | `aussenTemperaturGedaempft` | 0x5527 | DPTemp | temp | Außentemperatur gedämpft |
 | `KesselSollTemp` | 0x555A | DPTemp | temp | Kessel-Soll |
 | `WarmwasserSollTemp` | 0x6300 | DPTempS | global | Warmwasser-Soll |
-| `Nachladeunterdrückung` | 0x6551 | DPMode | global | Solar: Nachladeunterdrückung |
-| `Solarpumpe` | 0x6552 | DPMode | global | Solar: Pumpe |
-| `Wärmemenge` | 0x6560 | DPCount | global | Solar: Wärmemenge |
-| `KollektorTemp` | 0x6564 | DPTemp | global | Solar: Kollektortemperatur |
-| `Betriebsstunden` | 0x6568 | DPHours | global | Solar: Betriebsstunden |
 | `Stoerungsmeldung1` | 0x7507 | DPRaw (9 Byte) | stoerung | neuester Eintrag der Fehlerhistorie |
 | `Stoerungsmeldung2` | 0x7510 | DPRaw (9 Byte) | stoerung | 2. Eintrag |
 | `Stoerungsmeldung3` | 0x7519 | DPRaw (9 Byte) | stoerung | 3. Eintrag |
 
 Weitere Adressen (Brennerstarts, Brennerlaufzeit, Störmeldungen 4–10 usw.) sind in
 [src/viessmann.cpp](src/viessmann.cpp) auskommentiert und lassen sich bei Bedarf aktivieren.
+Mit `//-// … // entfernt: <Grund>` markierte Datenpunkte wurden nach dem Datenpunkt-Scan entfernt, weil sie an
+dieser Anlage keine sinnvollen Werte liefern (Fehlwert, Ersatzwert ohne Fühler, Heizkreis M2 oder Solar nicht vorhanden).
+Ihre Topics werden nicht mehr gesendet; vorhandene Zustände in ioBroker bekommen keine neuen Werte.
 Ein Datenpunkt wird gelesen, sobald er als globales Objekt definiert ist. Ohne eigenen Callback landet er
 automatisch beim globalen Callback.
 

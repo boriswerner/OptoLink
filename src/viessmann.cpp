@@ -9,13 +9,13 @@ VitoWiFi_setProtocol(KW);
 //DPCountS geraeteKennung("GeraeteKennung", "boiler", 0x00F8);
     DPTemp x2900("x2900", "temperature", 0x2900); //Vorlauftemperatur-Istwert?
 DPTemp aussenTemp("AußenTemp", "temperature", 0x0800);
-    DPTemp x0818("x0818", "temperature", 0x0818); //Rücklauftemperatur (17A) - Tiefpass?
+    //-// DPTemp x0818("x0818", "temperature", 0x0818); //Rücklauftemperatur (17A) - Tiefpass?  // entfernt: Rücklauf 17A Tiefpass, unplausibel (unter Außentemperatur), vermutlich kein Fühler
 DPTemp outsideTemp("aussenTemperaturTiefpass", "temperature", 0x5525); // 2-Byte, -60..60
     DPTempS partyTemperaturSoll("partyTemperaturSoll", "temperature", 0x2308);
 DPTemp outsideTempSmooth("aussenTemperaturGedaempft", "temperature", 0x5527); // 2-Byte, -60..60
     DPMode ferienbetrieb2("ferienbetrieb2", "state", 0x2303);
 DPTemp vorlaufSollTemp2("VorlaufSollTemp2", "temperature", 0x2544);//0 
-    DPMode solarpumpe("Solarpumpe", "state", 0x6552);//0 
+    //-// DPMode solarpumpe("Solarpumpe", "state", 0x6552);//0  // entfernt: Solarpumpe = 0, kein Solarmodul erkennbar
 DPMode heizkennlinieNiveau("heizkennlinieNiveau", "state", 0x27D4);
     DPTempS redRaumtemperaturSoll("redRaumtemperaturSoll", "temperature", 0x2307);
 DPCoP heizkennlinieNeigung("heizkennlinieNeigung", "state", 0x27D3);
@@ -27,18 +27,18 @@ DPCoP heizkennlinieNeigung("heizkennlinieNeigung", "state", 0x27D3);
 // Kesseltemperatur Tiefpass [R]
 DPTemp boilerTemp("boilerTemp", "temperature", 0x0810); // 2-Byte, 0..127
 // WW-Temperatur (Speicher) [R]
-    DPMode nachladeunterdrueckung("Nachladeunterdrückung", "state", 0x6551);//0 
+    //-// DPMode nachladeunterdrueckung("Nachladeunterdrückung", "state", 0x6551);//0  // entfernt: Nachladeunterdrückung Solar = 0, kein Solarmodul erkennbar
 DPTemp ladespeicherObenTemp("LadespeicherObenTemp", "temperature", 0x0812);
-    DPCount waermemenge("Wärmemenge", "counter", 0x6560);//0 
+    //-// DPCount waermemenge("Wärmemenge", "counter", 0x6560);//0  // entfernt: Wärmemenge Solar = 0, kein Solarmodul erkennbar
 DPTemp ladespeicherUntenTemp("LadespeicherUntenTemp", "temperature", 0x0814);
 // Raumtemperatur A1M1 Tiefpass RTS [R]
-    DPTemp roomTemp("heizkreisRaumtemperatur", "temperature", 0x0896); // 2-Byte, 0..127
+    //-// DPTemp roomTemp("heizkreisRaumtemperatur", "temperature", 0x0896); // 2-Byte, 0..127  // entfernt: Raumtemperatur, konstant 20,0 (Ersatzwert), kein Raumfühler
 // Abgastemperatur Tiefpass AGTS [R]
 DPTemp agtsTemp("abgastemperaturTiefpass", "temperature", 0x0816); // 2-Byte
-    DPTemp vltsTemp("vorlauftemperatur", "temperature", 0x080C); // 2-Byte
+    //-// DPTemp vltsTemp("vorlauftemperatur", "temperature", 0x080C); // 2-Byte  // entfernt: Vorlauf 17B, konstant 20,0 (Ersatzwert), vermutlich kein Fühler
 DPTemp abgasTemp("AbgasTempOderRuecklauf", "temperature", 0x0808);
 // Rücklauftemperatur (17A) [R]
-    DPTemp rltsTemp("rücklauftemperatur17A", "temperature", 0x080A); // 2-Byte
+    //-// DPTemp rltsTemp("rücklauftemperatur17A", "temperature", 0x080A); // 2-Byte  // entfernt: Rücklauf 17A, unplausibel (unter Außentemperatur), vermutlich kein Fühler
 // Vorlauftemperatur (17B) [R]
 // 0x0802 2-byte KTS Kesseltemperatur (Sensor 3)
 DPTemp kesselIstTemp("KesselIstTemp", "temperature", 0x0802);
@@ -58,15 +58,15 @@ DPTemp kesselSollTemp("KesselSollTemp", "temperature", 0x555A);
 // DPStat storePump("storePump", "pump", 0x0845);
 // Zirkulationspumpe [R]
 // DPStat circuitPump("circuitPump", "pump", 0x0846);
-    DPHours betriebsstunden("Betriebsstunden", "hours", 0x6568);
+    //-// DPHours betriebsstunden("Betriebsstunden", "hours", 0x6568);  // entfernt: Solar-Betriebsstunden seit 2022 konstant, kein Solarmodul erkennbar
 
 DPTempS warmwasserSollTemp("WarmwasserSollTemp", "temperature", 0x6300);
 
-    DPTemp kollektorTemp("KollektorTemp", "temperature", 0x6564);//3276,7 
-DPTemp vorlaufSollTemp("VorlaufSollTemp", "temperature", 0x3544);//0 
+    //-// DPTemp kollektorTemp("KollektorTemp", "temperature", 0x6564);//3276,7  // entfernt: Kollektortemperatur 7FFF = Fehlwert, kein Kollektorfühler
+//-// DPTemp vorlaufSollTemp("VorlaufSollTemp", "temperature", 0x3544);//0  // entfernt: Vorlauf-Soll M2 = 0, kein Heizkreis M2
     DPStat aim1Pump("a1m1Pump", "state", 0x2906);
 DPTemp warmwasserIstTemp("WarmwasserIstTemp", "temperature", 0x0804);
-    DPTemp vorlaufIstTemp("VorlaufIstTemp", "temperature", 0x3900);//0 
+    //-// DPTemp vorlaufIstTemp("VorlaufIstTemp", "temperature", 0x3900);//0  // entfernt: Vorlauf-Ist M2 = 0, kein Heizkreis M2
 // DPTemp solarspeicherTemp("SolarspeicherTemp", "boiler", 0x6566);//3276,7 
 
 // DPCount solartagesertrag("Solartagesertrag", "boiler", 0xCF30);//4294967295
@@ -75,7 +75,7 @@ DPTemp warmwasserIstTemp("WarmwasserIstTemp", "temperature", 0x0804);
 DPMode betriebsart("Betriebsart", "state", 0x3323);//2
     DPMode ferienbetrieb("ferienbetrieb", "state", 0x2535);
 DPMode betriebsart2("Betriebsart2", "state", 0x2323);//2
-    DPMode sparbetrieb("Sparbetrieb", "state", 0x3302);
+    //-// DPMode sparbetrieb("Sparbetrieb", "state", 0x3302);  // entfernt: Sparbetrieb M2, kein Heizkreis M2 (A1 wäre 0x2302)
 //-// DPHours brennerlaufzeit("Brennerlaufzeit", "boiler", 0x0886);
 //-// DPMode brennerstoerung("Brennerstörung", "boiler", 0x0883);//0
 
