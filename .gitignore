@@ -5,6 +5,8 @@ include/secrets.h
 
 # Echte Messwerte der Heizung (Datenpunkt-Scan)
 docs/datenpunkte/lokal/
+# Exporte aus ioBroker, InfluxDB und Grafana (Migration der Topics)
+docs/migration/lokal/
 __pycache__/
 
 # PlatformIO
