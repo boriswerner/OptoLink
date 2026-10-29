@@ -100,6 +100,16 @@ def candidates_from_excel(path):
     return out
 
 
+def firmware_importance():
+    """Einstufung aus src/viessmann.cpp: eingerückte Definitionen gelten als unwichtig, die übrigen als wichtig."""
+    text = open(os.path.join(ROOT, "src", "viessmann.cpp"), encoding="utf-8").read()
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    out = {}
+    for m in re.finditer(r'^([ \t]*)DP\w+\s+\w+\("[^"]+",\s*"[^"]*",\s*(0x[0-9A-Fa-f]+)\)', text, re.M):
+        out["0x%04X" % int(m.group(2), 16)] = "unwichtig" if m.group(1) else "wichtig"
+    return out
+
+
 def candidates_from_firmware():
     """Aktive Datenpunkte aus src/viessmann.cpp (Name = MQTT-Topic)."""
     text = open(os.path.join(ROOT, "src", "viessmann.cpp"), encoding="utf-8").read()
@@ -291,7 +301,7 @@ PRIORITY = {"Firmware": 0, "Addressen": 1, "Tabelle1 " + MODEL: 2}
 XLSX_NAME = "datenpunkte-vscotho1.xlsx"
 USER_COLUMNS = ("Bestätigter Typ", "Kommentar")
 WIDTHS = {"Adresse": 9, "Länge": 7, "Klarname": 34, "Weitere Bezeichnungen": 34, "Quellen": 26,
-          "MQTT-Topic (heute)": 22, "Rohwert (hex)": 20, "Vorgeschlagener Typ": 12, "Wert": 11,
+          "MQTT-Topic (heute)": 22, "Wichtig (viessmann.cpp)": 12, "Rohwert (hex)": 20, "Vorgeschlagener Typ": 12, "Wert": 11,
           "Bewertung": 12, "Hinweis": 50, "Varianten": 50, "Bestätigter Typ": 16, "Kommentar": 40}
 
 
@@ -341,7 +351,10 @@ def write_xlsx(path, rows):
         ws.column_dimensions[head.column_letter].width = WIDTHS.get(c, 14)
     ws.freeze_panes = "B2"
     ws.auto_filter.ref = ws.dimensions
-    wb.save(path)
+    try:
+        wb.save(path)
+    except PermissionError:
+        sys.exit(f"{os.path.basename(path)} ist gesperrt (in Excel geöffnet?). Bitte speichern, schließen und erneut auswerten.")
     if user:
         print(f"Eigene Angaben zu {len(user)} Adressen übernommen")
 
@@ -349,6 +362,7 @@ def write_xlsx(path, rows):
 def cmd_auswerten(args):
     cands = json.load(open(os.path.join(OUT, "kandidaten.json"), encoding="utf-8"))
     scan = json.load(open(os.path.join(OUT, "scan.json"), encoding="utf-8"))
+    importance = firmware_importance()
     by_addr = {}
     for c in cands:
         by_addr.setdefault(c["addr"], []).append(c)
@@ -381,7 +395,8 @@ def cmd_auswerten(args):
             "Adresse": addr, "Länge": res.get("len", ""), "Klarname": name,
             "Weitere Bezeichnungen": "; ".join(sorted(set(names) - {name})),
             "Quellen": "; ".join(sorted({c["source"] for c in cs})),
-            "MQTT-Topic (heute)": topic, "Rohwert (hex)": res.get("hex") or "",
+            "MQTT-Topic (heute)": topic, "Wichtig (viessmann.cpp)": importance.get(addr, ""),
+            "Rohwert (hex)": res.get("hex") or "",
             "Vorgeschlagener Typ": typ, "Wert": "" if value is None else value,
             "Bewertung": verdict, "Hinweis": " | ".join(hints), "Varianten": variants(raw),
             "Bestätigter Typ": "", "Kommentar": ""})
