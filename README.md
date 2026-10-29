@@ -256,10 +256,44 @@ Gruppe und Einheit ergeben sich aus dem zweiten Parameter der Datenpunkt-Definit
 | `/api/status` | GET | JSON: Uhrzeit, Laufzeit, Heap, WLAN, MQTT, `error`, Intervall, letzte/nächste Abfrage, alle Werte mit Gruppe und Zeitstempel |
 | `/api/logs` | GET | Log als Text |
 | `/api/restart` | POST | startet den ESP neu (ein GET bewirkt nichts) |
+| `/api/scan/start` | POST | Scan-Modus: reguläre Abfrage pausiert (endet 10 Minuten nach der letzten Scan-Anfrage) |
+| `/api/scan/stop` | POST | Scan-Modus beenden |
+| `/api/raw?list=0x0800:2,0x0802:2,…` | GET | bis zu 16 Adressen roh lesen (Länge 1..9), nur im Scan-Modus; liefert `{"id":n}` |
+| `/api/raw/result` | GET | Ergebnis der letzten `/api/raw`-Anfrage: je Adresse Zustand und Rohbytes als Hex |
 
 Das Log ist ein Ringpuffer mit den letzten **120** Meldungen im RAM, nach einem Neustart ist es leer.
 Ein voller Abfragezyklus braucht ca. 90 Zeilen. Seite, JSON und Log werden stückweise gesendet, damit kein großer
 String den Heap fragmentiert.
+
+---
+
+## Datenpunkte ermitteln (Scan)
+
+Welche Adressen die Heizung wirklich liefert und mit welchem Typ, lässt sich mit
+[tools/datenpunkte/datenpunkte.py](tools/datenpunkte/datenpunkte.py) prüfen. Der Scan **liest nur**, er schreibt nie.
+
+```
+python tools/datenpunkte/datenpunkte.py kandidaten <adressliste.xlsx>   # Kandidaten sammeln
+python tools/datenpunkte/datenpunkte.py scan                            # an der Heizung lesen (Sekunden)
+python tools/datenpunkte/datenpunkte.py auswerten                       # Excel-Liste erzeugen
+```
+
+- **Kandidaten:** alle Adressen aus der Excel-Adressliste (Blatt „Tabelle1“ mit allen Modellblöcken, Blatt
+  „Addressen“ mit eigenen Tests) und die aktiven Datenpunkte aus [src/viessmann.cpp](src/viessmann.cpp).
+- **Scan:** liest über `/api/raw` je 16 Adressen in einem Rutsch. Das ist wichtig: Einzeln gesendete Anfragen müssen
+  beim KW-Protokoll jeweils ca. 2 s auf das Sync-Signal der Heizung warten, gemeinsam eingereiht laufen sie direkt
+  hintereinander. Ein abgebrochener Scan wird beim nächsten Aufruf fortgesetzt (`--neu` beginnt von vorn).
+- **Auswerten:** deutet jeden Rohwert nach dem Typ der Quellen und in gängigen Varianten (u8, s8, u16, s16/10,
+  u16/100, u32), bewertet die Plausibilität (plausibel / fraglich / Fehlwert, z. B. `FF…` = nicht belegt) und schreibt
+  eine Excel-Liste. Die Spalten „Genutzt in ioBroker“, „Bestätigter Typ“ und „Kommentar“ sind für eigene Angaben und
+  bleiben bei jeder Neuauswertung erhalten.
+
+Alle Ausgaben enthalten echte Messwerte und landen deshalb in `docs/datenpunkte/lokal/`, das per `.gitignore` nicht
+eingecheckt wird. Abhängigkeit: `openpyxl` (`pip install openpyxl`).
+
+**Hinweis zum KW-Protokoll:** Praktisch jede Adresse liefert irgendwelche Bytes. „Antwortet“ heißt also nicht
+„existiert“; ob ein Datenpunkt sinnvoll ist, zeigt nur die Plausibilität und am sichersten ein Vorher/Nachher-Vergleich
+(Wert am Bedienteil ändern, erneut lesen).
 
 ---
 
