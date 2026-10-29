@@ -4,12 +4,12 @@ Schritte (Ausgaben in docs/datenpunkte/lokal/, per .gitignore ausgeschlossen, da
   python datenpunkte.py kandidaten <addressen.xlsx>   -> kandidaten.json
   python datenpunkte.py scan [--host optolink] [--neu] -> scan.json (liest über /api/raw, 16 Adressen je
                                                          Paket; ein abgebrochener Scan wird fortgesetzt)
-  python datenpunkte.py auswerten                     -> datenpunkte-vscotho1.csv, uebersicht.md
+  python datenpunkte.py auswerten                     -> datenpunkte-vscotho1.xlsx (eigene Angaben in
+                                                         "Bestätigter Typ"/"Kommentar" bleiben erhalten), uebersicht.md
 
 Abhängigkeit: openpyxl (nur für "kandidaten"). Der Scan liest nur, er schreibt nie in die Heizung.
 """
 import argparse
-import csv
 import datetime
 import json
 import os
@@ -288,6 +288,62 @@ def variants(raw):
 
 
 PRIORITY = {"Firmware": 0, "Addressen": 1, "Tabelle1 " + MODEL: 2}
+XLSX_NAME = "datenpunkte-vscotho1.xlsx"
+USER_COLUMNS = ("Bestätigter Typ", "Kommentar")
+WIDTHS = {"Adresse": 9, "Länge": 7, "Klarname": 34, "Weitere Bezeichnungen": 34, "Quellen": 26,
+          "MQTT-Topic (heute)": 22, "Rohwert (hex)": 20, "Vorgeschlagener Typ": 12, "Wert": 11,
+          "Bewertung": 12, "Hinweis": 50, "Varianten": 50, "Bestätigter Typ": 16, "Kommentar": 40}
+
+
+def read_user_input(path):
+    """Eigene Angaben (bestätigter Typ, Kommentar) aus einer vorhandenen Liste, je Adresse."""
+    if not os.path.exists(path):
+        return {}
+    import openpyxl
+    ws = openpyxl.load_workbook(path).active
+    header = [c.value for c in ws[1]]
+    out = {}
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        rec = dict(zip(header, row))
+        values = {k: rec.get(k) for k in USER_COLUMNS if rec.get(k) not in (None, "")}
+        if values and rec.get("Adresse"):
+            out[rec["Adresse"]] = values
+    return out
+
+
+def write_xlsx(path, rows):
+    """Excel-Datei mit festen Zelltypen: Wert als Zahl, Adressen/Rohwerte als Text.
+    Eigene Angaben aus einer vorhandenen Datei werden übernommen."""
+    import openpyxl
+    from openpyxl.styles import Alignment, Font, PatternFill
+    user = read_user_input(path)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = MODEL
+    cols = list(rows[0].keys())
+    ws.append(cols)
+    for r in rows:
+        for k, v in user.get(r["Adresse"], {}).items():
+            r[k] = v
+        ws.append([r[c] for c in cols])
+    text_cols = {i + 1 for i, c in enumerate(cols) if c != "Wert" and c != "Länge"}
+    for row in ws.iter_rows(min_row=2):
+        for cell in row:
+            if cell.column in text_cols:
+                cell.number_format = "@"   # Text: Excel deutet "1e02" o. Ä. nicht um
+    fill = PatternFill("solid", fgColor="FFF2CC")
+    for i, c in enumerate(cols, 1):
+        head = ws.cell(row=1, column=i)
+        head.font = Font(bold=True)
+        head.alignment = Alignment(wrap_text=True, vertical="top")
+        if c in USER_COLUMNS:
+            head.fill = fill
+        ws.column_dimensions[head.column_letter].width = WIDTHS.get(c, 14)
+    ws.freeze_panes = "B2"
+    ws.auto_filter.ref = ws.dimensions
+    wb.save(path)
+    if user:
+        print(f"Eigene Angaben zu {len(user)} Adressen übernommen")
 
 
 def cmd_auswerten(args):
@@ -329,11 +385,8 @@ def cmd_auswerten(args):
             "Vorgeschlagener Typ": typ, "Wert": "" if value is None else value,
             "Bewertung": verdict, "Hinweis": " | ".join(hints), "Varianten": variants(raw),
             "Bestätigter Typ": "", "Kommentar": ""})
-    path = os.path.join(OUT, "datenpunkte-vscotho1.csv")
-    with open(path, "w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()), delimiter=";")
-        w.writeheader()
-        w.writerows(rows)
+    path = os.path.join(OUT, XLSX_NAME)
+    write_xlsx(path, rows)
     counts = {}
     for r in rows:
         counts[r["Bewertung"]] = counts.get(r["Bewertung"], 0) + 1
@@ -341,7 +394,7 @@ def cmd_auswerten(args):
         f.write(f"# Datenpunkte {MODEL}\n\nScan vom {scan['zeit']}, {len(rows)} Adressen: "
                 + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())) + ".\n\n"
                 "Vollständige Liste mit Rohwerten und Spalten für eigene Angaben: "
-                "[datenpunkte-vscotho1.csv](datenpunkte-vscotho1.csv).\n\n"
+                f"[{XLSX_NAME}]({XLSX_NAME}).\n\n"
                 "## Plausible Datenpunkte\n\n| Adresse | Klarname | Typ | Wert | MQTT-Topic (heute) |\n|---|---|---|---|---|\n")
         for r in rows:
             if r["Bewertung"] == "plausibel":
