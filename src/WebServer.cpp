@@ -22,13 +22,8 @@ void StartWebServer() {
 
 
 
+// Seite stückweise senden statt als großen String zusammenzubauen (Heap-Fragmentierung)
 void ShowPage(String content, String script, String style) {
-	String page = FPSTR(HTTP_HEADER);
-	page += script;
-	page += FPSTR(HTTP_SCRIPT_END);
-	page += style;
-	page += FPSTR(HTTP_CONTAINER);
-
 	// replacements
 	content.replace("{menu}", FPSTR(HTTP_MENU));
 	content.replace("{onmessage}", onmessage);
@@ -36,9 +31,16 @@ void ShowPage(String content, String script, String style) {
 	content.replace("{color}", "#FF0000");
 	onmessage = "&nbsp;";
 	offmessage = "&nbsp;";
-	page += content;
-	page += FPSTR(HTTP_END);
-	WebServer.send(200, "text/html", page);
+
+	WebServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+	WebServer.send(200, "text/html", "");
+	WebServer.sendContent_P(HTTP_HEADER);
+	WebServer.sendContent(script);
+	WebServer.sendContent_P(HTTP_SCRIPT_END);
+	WebServer.sendContent(style);
+	WebServer.sendContent_P(HTTP_CONTAINER);
+	WebServer.sendContent(content);
+	WebServer.sendContent_P(HTTP_END);
 }
 
 String MainMenu() {
@@ -72,7 +74,21 @@ void HandleRestart() {
 }
 
 void HandleGetLogs() {
-	WebServer.send(200, "text/html", GetLogs());
+	WebServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+	WebServer.send(200, "text/html", "");
+	String chunk;
+	chunk.reserve(1100);
+	for (int i = 0; i < GetLogCount(); i++) {
+		chunk += GetLogLine(i);
+		chunk += "\n";
+		if (chunk.length() > 1000) {
+			WebServer.sendContent(chunk);
+			chunk = "";
+		}
+	}
+	if (chunk.length() > 0) {
+		WebServer.sendContent(chunk);
+	}
 }
 
 WebServer::WebServer()

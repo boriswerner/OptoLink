@@ -83,7 +83,7 @@ void loop() {
 }
 
 void getValues() {
-  Log("getvalues()");
+  Log("getvalues() freier Heap: " + String(ESP.getFreeHeap()));
   getVitoData();
 }
 

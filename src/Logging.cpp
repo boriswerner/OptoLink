@@ -2,7 +2,7 @@
 #include "Arduino.h"
 #include <WiFiClient.h>
 #include <time.h>
-const int LOG_DATA_SIZE = 80;
+const int LOG_DATA_SIZE = 120;		// ein voller Abfragezyklus braucht ca. 90 Zeilen
 String LOG_DATA[LOG_DATA_SIZE];
 int LOG_DATA_INDEX = 0;
 
@@ -34,12 +34,12 @@ void Log(String message, bool dummyTime) {
 	LOG_DATA_INDEX++;
 }
 
-String GetLogs() {
-	String response;
-	for (int i = 0; i < LOG_DATA_INDEX; i++) {
-		response += LOG_DATA[i] + "\n";
-	}
-	return response;
+int GetLogCount() {
+	return LOG_DATA_INDEX;
+}
+
+const String& GetLogLine(int index) {
+	return LOG_DATA[index];
 }
 
 // Sammelt Ausgaben zeilenweise und übernimmt nur Fehlerzeilen ins Log
