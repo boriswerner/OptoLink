@@ -10,7 +10,7 @@ void Log(String message) {
 }
 
 void Log(String message, bool dummyTime) {
-	Serial.println(message.c_str());
+	// Keine Ausgabe auf Serial: die UART ist die Optolink-Leitung zur Heizung.
 	if (LOG_DATA_INDEX > LOG_DATA_SIZE - 1) {
 		for (int i = 1; i < LOG_DATA_SIZE; i++) {
 			LOG_DATA[i - 1] = LOG_DATA[i];
@@ -35,6 +35,20 @@ String GetLogs() {
 		response += LOG_DATA[i] + "\n";
 	}
 	return response;
+}
+
+// Sammelt Ausgaben zeilenweise und übernimmt nur Fehlerzeilen ins Log
+size_t ErrorLogPrint::write(uint8_t c) {
+	if (c == '\n') {
+		if (_line.indexOf("error") >= 0 || _line.indexOf("timeout") >= 0) {
+			Log("VitoWiFi: " + _line);
+		}
+		_line = "";
+	}
+	else if (c != '\r' && _line.length() < 120) {
+		_line += (char)c;
+	}
+	return 1;
 }
 
 Logging::Logging()

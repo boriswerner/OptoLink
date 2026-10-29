@@ -37,9 +37,7 @@ void setup() {
 		delay(200);
 		digitalWrite(LED_PIN, LOW);
 		delay(200);
-		Serial.print(".");
 	}
-	Serial.println();
 
 	setupArduinoOta();
   

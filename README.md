@@ -268,9 +268,10 @@ Upload-Weg und serieller Monitor sind in [platformio.ini](platformio.ini) einges
 
 ```ini
 monitor_speed = 4800
-#upload_port = 192.168.178.70   ; OTA über WLAN
-upload_port = COM8              ; USB
-#upload_speed = 921600
+upload_protocol = espota        ; OTA über WLAN (Standard)
+upload_port = optolink.local
+#upload_protocol = esptool      ; USB als Rückfall
+#upload_port = COM8
 ```
 
 | Aktion | VS Code (Statusleiste unten) | Kommandozeile |
@@ -279,22 +280,26 @@ upload_port = COM8              ; USB
 | Flashen | → (Upload) | `pio run -t upload` |
 | Serieller Monitor | 🔌 | `pio device monitor` |
 
-**Per USB:** Board an `COM8` (Port im Geräte-Manager prüfen und ggf. anpassen).
-Den Optolink-Adapter vorher abziehen, weil er an denselben RX/TX-Leitungen hängt wie der USB-Seriell-Wandler.
+**Per WLAN (OTA, Standard):** Das Board muss als `optolink.local` erreichbar sein. Beim Upload baut der ESP eine
+TCP-Verbindung zurück zum PC auf. Deshalb muss die Windows-Firewall eingehende Verbindungen für das Python von
+PlatformIO (`%USERPROFILE%\.platformio\penv\Scripts\python.exe`) erlauben. Sonst endet der Upload mit „No Answer“.
 
-**Per WLAN (OTA):** `upload_port = COM8` auskommentieren und die Zeile mit der IP des ESP aktivieren
-(oder `upload_port = optolink.local`). Dafür muss im Netz UDP/TCP zwischen PC und ESP erlaubt sein
-(Windows-Firewall für Python/espota freigeben).
+**Per USB (Rückfall):** In `platformio.ini` die beiden OTA-Zeilen aus- und die beiden USB-Zeilen einkommentieren.
+Board an `COM8` (Port im Geräte-Manager prüfen und ggf. anpassen). Den Optolink-Adapter vorher abziehen, weil er an
+denselben RX/TX-Leitungen hängt wie der USB-Seriell-Wandler.
 
 ---
 
 ## Bekannte Einschränkungen und Hinweise
 
-- **Log-Ausgaben gehen auf die Optolink-Leitung.** `Log()` schreibt per `Serial.println()` auf dieselbe UART, an der
-  der Adapter hängt. Diese Texte landen also auch bei der Heizung. In der Praxis stört das offenbar nicht, sauberer wäre
-  aber eine Log-Ausgabe über `Serial1` (nur TX, GPIO2) oder gar nicht seriell.
-- **Serieller Monitor:** Nach dem Start schaltet VitoWiFi `Serial` auf 8E2 um und es laufen Protokoll-Bytes über die Leitung.
-  Der Monitor zeigt deshalb Zeichensalat. Für die Diagnose eignet sich die Log-Seite im Browser besser.
+- **Keine seriellen Ausgaben auf der UART.** Die UART ist die Optolink-Leitung zur Heizung. Früher schrieb `Log()` dort
+  hinein, die Heizung verschluckte sich daran, und nur jeder zweite Datenpunkt kam an. Deshalb gehen Log-Ausgaben nur noch
+  in den Log-Puffer der Weboberfläche. **Keine neuen `Serial.print`-Aufrufe einbauen!**
+- **Fehler beim Lesen** meldet VitoWiFi im Web-Log als `VitoWiFi: DP <Name> error: …` (Filter `ErrorLogPrint` in
+  [src/Logging.cpp](src/Logging.cpp)). Ein Durchlauf aller Datenpunkte dauert etwa eine Sekunde.
+- **Serieller Monitor:** Über die UART laufen nur Protokoll-Bytes (8E2). Für die Diagnose ist die Log-Seite im Browser gedacht.
+- **Log-Puffer:** 80 Zeilen reichen nicht ganz für einen vollen Zyklus (etwa 86 Zeilen). Die ersten Datenpunkte eines Zyklus
+  sind deshalb im Web-Log schon herausgefallen, wenn der Zyklus durch ist.
 - **Keine Uhrzeit-Synchronisierung:** Es gibt kein NTP. Die Log-Zeitstempel beginnen beim Start bei `01.01. 00:00:00`
   und zeigen damit die Laufzeit, nicht die echte Uhrzeit. Die Zeitstempel der Störmeldungen kommen dagegen aus der Heizung und stimmen.
 - **Keine Absicherung:** Weboberfläche (inkl. Neustart) und OTA-Update sind ohne Passwort erreichbar. Das Gerät gehört nur in ein

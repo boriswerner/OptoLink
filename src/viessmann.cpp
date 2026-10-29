@@ -121,8 +121,12 @@ void tempCallbackHandler(const IDatapoint& dp, DPValue value);
 void globalCallbackHandler(const IDatapoint& dp, DPValue value);
 void stoerungsmeldungCallbackHandler(const IDatapoint& dp, DPValue value);
 
+ErrorLogPrint vitoErrorLog;
+
 void setupVito() {
     VitoWiFi.setup(&Serial);
+    VitoWiFi.setLogger(&vitoErrorLog);
+    VitoWiFi.enableLogger();
     aussenTemp.setCallback(&tempCallbackHandler);
     outsideTemp.setCallback(&tempCallbackHandler);
     outsideTempSmooth.setCallback(&tempCallbackHandler);

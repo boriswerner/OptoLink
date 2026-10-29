@@ -10,7 +10,7 @@ String offmessage = "&nbsp;";
 
 
 void StartWebServer() {
-	Serial.println("Start WebServer");
+	Log("Start WebServer");
 	WebServer.on("/", HandleRoot);
 	WebServer.on("/Logs", HandleLogs);
 	WebServer.on("/getLogs", HandleGetLogs);

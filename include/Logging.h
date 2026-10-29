@@ -10,6 +10,14 @@ void Log(String message, bool dummyTime);
 
 String GetLogs();
 
+// Print-Ziel für den VitoWiFi-Logger: schreibt nur Fehler/Timeouts ins Log
+class ErrorLogPrint : public Print {
+public:
+	size_t write(uint8_t c) override;
+private:
+	String _line;
+};
+
 class Logging
 {
 public:
