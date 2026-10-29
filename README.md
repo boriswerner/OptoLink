@@ -29,9 +29,11 @@ Der Zugriff ist **rein lesend**: Die Firmware schreibt keine Werte in die Heizun
 | Funktion | Details |
 |---|---|
 | Heizung auslesen | Viessmann **KW-Protokoll** über Optolink, 4800 Baud, 8E2, Bibliothek [VitoWiFi](https://github.com/bertmelis/VitoWiFi) 1.x |
-| Abfrageintervall | alle **120 Sekunden** werden alle definierten Datenpunkte gelesen (plus einmal direkt nach dem Start) |
+| Abfrageintervall | alle **60 Sekunden** werden alle definierten Datenpunkte gelesen (plus einmal direkt nach dem Start); ein Durchlauf dauert ca. 1 s |
 | MQTT | jeder gelesene Wert wird unter `optolink/<Name>` veröffentlicht ([PubSubClient](https://github.com/knolleary/pubsubclient)) |
-| MQTT-Verbindung | Prüfung und ggf. Neuverbindung alle **60 Sekunden** |
+| MQTT-Verbindung | Prüfung und ggf. Neuverbindung alle **10 Sekunden**, Fehlerursache im Log |
+| WLAN | automatische Neuverbindung, kein Energiesparmodus, Neustart nach **5 Minuten** ohne WLAN |
+| Uhrzeit | per NTP vom Router, Zeitzone Deutschland mit Sommerzeit (für die Log-Zeitstempel) |
 | Störmeldungen | die letzten 3 Einträge der Fehlerhistorie werden dekodiert (Zeitstempel + Klartext) |
 | Weboberfläche | Port 80: Startseite, Live-Log, Neustart |
 | OTA-Update | ArduinoOTA, Hostname `optolink` |
@@ -85,17 +87,22 @@ Externe Bibliotheken (lädt PlatformIO automatisch): `bertmelis/VitoWiFi@^1.0.2`
 ### Start (`setup()` in [src/main.cpp](src/main.cpp))
 
 1. `Serial` wird mit 4800 Baud geöffnet, die LED als Ausgang gesetzt.
-2. **WLAN:** Station-Modus, Hostname `OptoLink`, Verbindung mit den Daten aus `secrets.h`.
-   Bis die Verbindung steht, blinkt die LED (200 ms an/aus). Ein Timeout gibt es nicht, der ESP wartet beliebig lange.
+2. **WLAN:** Station-Modus ohne Energiesparen, automatische Neuverbindung, Hostname `OptoLink`, Zugangsdaten aus `secrets.h`.
+   Bis die Verbindung steht, blinkt die LED (200 ms an/aus). Klappt das 5 Minuten lang nicht, startet der ESP neu.
+   Im Betrieb prüft `checkWifi()` alle 10 s die Verbindung; nach 5 Minuten ohne WLAN folgt ebenfalls ein Neustart.
+   Die Zugangsdaten werden dabei nie gelöscht.
 3. **OTA** wird mit dem Hostnamen `optolink` gestartet (ohne Passwort).
-4. **MQTT:** Broker-Adresse setzen, sofort verbinden, danach alle 60 s die Verbindung prüfen.
+4. **NTP** (`setupNtp()`): Zeitserver ist der Router (Gateway-Adresse), Zeitzone `CET-1CEST,M3.5.0,M10.5.0/3`.
+   Der ESP8266-Core gleicht die Zeit danach selbstständig regelmäßig ab. Bis zur ersten Antwort zeigt das Log `01.01.`.
+5. **MQTT:** Broker-Adresse setzen, sofort verbinden, danach alle 10 s die Verbindung prüfen.
    Client-ID: `optolink`, Benutzer und Passwort aus `secrets.h`.
-5. Die eigene IP-Adresse wird geloggt, dann startet der **Webserver** auf Port 80.
-6. Zusätzlich wird ein TCP-Server auf **Port 81** geöffnet. Er war für eine WLAN-Seriell-Brücke gedacht
+6. Die eigene IP-Adresse wird geloggt, dann startet der **Webserver** auf Port 80.
+7. Zusätzlich wird ein TCP-Server auf **Port 81** geöffnet. Er war für eine WLAN-Seriell-Brücke gedacht
    (`wifiSerialLoop()`), die aber auskommentiert ist. Der Port ist also offen, tut aber nichts.
-7. **VitoWiFi** wird eingerichtet (`setupVito()`): Die Bibliothek stellt `Serial` auf 4800 Baud, 8E2 um,
+8. **VitoWiFi** wird eingerichtet (`setupVito()`): Die Bibliothek stellt `Serial` auf 4800 Baud, 8E2 um,
    registriert alle Datenpunkte und hängt die Callbacks an.
-8. Alle 120 s wird `getValues()` aufgerufen, das einmal sofort läuft und `VitoWiFi.readAll()` anstößt.
+9. Alle 60 s wird `getValues()` aufgerufen. Es läuft einmal sofort, protokolliert den freien Heap und stößt
+   `VitoWiFi.readAll()` an.
 
 ### Hauptschleife (`loop()`)
 
@@ -222,7 +229,9 @@ Erreichbar unter `http://<IP-des-ESP>/` (die IP steht im Log und im Router).
 | `/getLogs` | Log als reiner Text (wird von `/Logs` abgefragt) |
 | `/restart` | startet den ESP neu |
 
-Das Log ist ein Ringpuffer mit den letzten **80** Meldungen im RAM, nach einem Neustart ist es leer.
+Das Log ist ein Ringpuffer mit den letzten **120** Meldungen im RAM, nach einem Neustart ist es leer.
+Ein voller Abfragezyklus braucht ca. 90 Zeilen. Die Seiten werden stückweise gesendet, damit kein großer String
+den Heap fragmentiert.
 
 ---
 
@@ -257,7 +266,7 @@ Fehlt `secrets.h`, bricht der Build mit „secrets.h: No such file or directory�
 ### 3. Optional anpassen
 
 - **Topic-Präfix:** `topic_prefix` in [include/mqtt.h](include/mqtt.h) (Standard `optolink/`)
-- **Abfrageintervall:** `t.every(120000, getValues)` in [src/main.cpp](src/main.cpp) (Millisekunden)
+- **Abfrageintervall:** `t.every(60000, getValues)` in [src/main.cpp](src/main.cpp) (Millisekunden)
 - **Datenpunkte:** in [src/viessmann.cpp](src/viessmann.cpp) ein- oder auskommentieren
 
 ---
@@ -298,15 +307,15 @@ denselben RX/TX-Leitungen hängt wie der USB-Seriell-Wandler.
 - **Fehler beim Lesen** meldet VitoWiFi im Web-Log als `VitoWiFi: DP <Name> error: …` (Filter `ErrorLogPrint` in
   [src/Logging.cpp](src/Logging.cpp)). Ein Durchlauf aller Datenpunkte dauert etwa eine Sekunde.
 - **Serieller Monitor:** Über die UART laufen nur Protokoll-Bytes (8E2). Für die Diagnose ist die Log-Seite im Browser gedacht.
-- **Log-Puffer:** 80 Zeilen reichen nicht ganz für einen vollen Zyklus (etwa 86 Zeilen). Die ersten Datenpunkte eines Zyklus
-  sind deshalb im Web-Log schon herausgefallen, wenn der Zyklus durch ist.
-- **Keine Uhrzeit-Synchronisierung:** Es gibt kein NTP. Die Log-Zeitstempel beginnen beim Start bei `01.01. 00:00:00`
-  und zeigen damit die Laufzeit, nicht die echte Uhrzeit. Die Zeitstempel der Störmeldungen kommen dagegen aus der Heizung und stimmen.
+- **Uhrzeit:** Bis die erste NTP-Antwort da ist (normalerweise wenige Sekunden nach dem Start), zeigen die Log-Zeitstempel
+  `01.01.`. Antwortet der Router nicht als Zeitserver, bleibt das so. Die Zeitstempel der Störmeldungen kommen aus der Heizung.
+- **MQTT-Verbindungsaufbau blockiert:** Ist der Broker nicht erreichbar, kann jeder Verbindungsversuch (alle 10 s) die Hauptschleife
+  einige Sekunden lang aufhalten (Weboberfläche und OTA reagieren dann verzögert).
 - **Keine Absicherung:** Weboberfläche (inkl. Neustart) und OTA-Update sind ohne Passwort erreichbar. Das Gerät gehört nur in ein
   vertrauenswürdiges Netz.
 - **Port 81** ist geöffnet, aber ohne Funktion (Rest der deaktivierten WLAN-Seriell-Brücke).
 - **MQTT:** kein Retain, kein Last Will. Ist der Broker beim Lesen nicht verbunden, gehen die Werte dieses Zyklus verloren.
-  Die Neuverbindung erfolgt spätestens nach 60 s.
+  Die Neuverbindung erfolgt spätestens nach 10 s.
 - **Umlaute in Topics** (`AußenTemp`, `Wärmemenge`, `Nachladeunterdrückung`, `rücklauftemperatur17A`): Erlaubt (UTF-8),
   manche Werkzeuge kommen damit aber schlecht zurecht.
 - **Unsichere Adressen:** Einige Datenpunkte (`x2900`, `x0818`, `AbgasTempOderRuecklauf`, 0x35xx/0x39xx) sind

@@ -68,7 +68,7 @@ void setup() {
   server->begin();
   setupVito();
 
-  t.every(120000,getValues);
+  t.every(60000,getValues);
   getValues();
 }
 
