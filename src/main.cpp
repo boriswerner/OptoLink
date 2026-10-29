@@ -14,6 +14,8 @@
 
 const int LED_PIN = LED_BUILTIN;
 const int PORT = 81;
+const unsigned long WIFI_TIMEOUT_MS = 5 * 60 * 1000UL;	// Neustart nach 5 Minuten ohne WLAN
+unsigned long wifiLostSince = 0;
 
 WiFiServer* server = NULL;
 WiFiClient serverClient;
@@ -23,6 +25,7 @@ Timer t;
 void wifiSerialLoop();
 void setupArduinoOta();
 void setupNtp();
+void checkWifi();
 void getValues();
 
 void setup() {
@@ -32,10 +35,16 @@ void setup() {
 	// -------- WLAN Connection
 	Log("Connecting to WLAN");
 	WiFi.mode(WIFI_STA);
+	WiFi.setSleepMode(WIFI_NONE_SLEEP);
+	WiFi.setAutoReconnect(true);
 	WiFi.hostname("OptoLink");
 	WiFi.begin(WIFI_SSID, WIFI_PW);
 
+	unsigned long wifiStart = millis();
 	while (WiFi.status() != WL_CONNECTED) {
+		if (millis() - wifiStart > WIFI_TIMEOUT_MS) {
+			ESP.restart();	// Zugangsdaten bleiben erhalten, nur neu versuchen
+		}
 		digitalWrite(LED_PIN, HIGH);
 		delay(200);
 		digitalWrite(LED_PIN, LOW);
@@ -44,6 +53,7 @@ void setup() {
 
 	setupArduinoOta();
 	setupNtp();
+	t.every(10000, checkWifi);
 
   setupMqtt();
   t.every(60000,checkMqtt);
@@ -75,6 +85,24 @@ void loop() {
 void getValues() {
   Log("getvalues()");
   getVitoData();
+}
+
+// Kurze Aussetzer überbrückt setAutoReconnect(); nach 5 Minuten ohne WLAN Neustart
+void checkWifi() {
+	if (WiFi.status() == WL_CONNECTED) {
+		if (wifiLostSince != 0) {
+			Log("WLAN wieder verbunden");
+			wifiLostSince = 0;
+		}
+		return;
+	}
+	if (wifiLostSince == 0) {
+		wifiLostSince = millis();
+		Log("WLAN getrennt");
+	}
+	else if (millis() - wifiLostSince > WIFI_TIMEOUT_MS) {
+		ESP.restart();
+	}
 }
 
 void setupNtp() {
