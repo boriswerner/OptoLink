@@ -1,6 +1,7 @@
 #include "Logging.h"
 #include "Arduino.h"
 #include <WiFiClient.h>
+#include <time.h>
 const int LOG_DATA_SIZE = 80;
 String LOG_DATA[LOG_DATA_SIZE];
 int LOG_DATA_INDEX = 0;
@@ -19,11 +20,15 @@ void Log(String message, bool dummyTime) {
 	}
 	char logString[170];
 	if (dummyTime) {
-		sprintf(logString, "00.00. 00:00:00 - %s", message.c_str());
+		snprintf(logString, sizeof(logString), "00.00. 00:00:00 - %s", message.c_str());
 		LOG_DATA[LOG_DATA_INDEX] = logString;
 	}
 	else {
-		sprintf(logString, "%02d.%02d. %02d:%02d:%02d - %s", day(), month(), hour(), minute(), second(), message.c_str());
+		// Ortszeit aus der SNTP-Uhr des Cores (Zeitzone siehe setupNtp() in main.cpp)
+		time_t now = time(nullptr);
+		struct tm lt;
+		localtime_r(&now, &lt);
+		snprintf(logString, sizeof(logString), "%02d.%02d. %02d:%02d:%02d - %s", lt.tm_mday, lt.tm_mon + 1, lt.tm_hour, lt.tm_min, lt.tm_sec, message.c_str());
 		LOG_DATA[LOG_DATA_INDEX] = logString;
 	}
 	LOG_DATA_INDEX++;

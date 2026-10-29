@@ -9,6 +9,8 @@
 #include "WebServer.h"
 #include "viessmann.h"
 #include "secrets.h"
+#include <time.h>
+#include <coredecls.h>
 
 const int LED_PIN = LED_BUILTIN;
 const int PORT = 81;
@@ -20,6 +22,7 @@ Timer t;
 
 void wifiSerialLoop();
 void setupArduinoOta();
+void setupNtp();
 void getValues();
 
 void setup() {
@@ -40,7 +43,8 @@ void setup() {
 	}
 
 	setupArduinoOta();
-  
+	setupNtp();
+
   setupMqtt();
   t.every(60000,checkMqtt);
   checkMqtt();
@@ -71,6 +75,21 @@ void loop() {
 void getValues() {
   Log("getvalues()");
   getVitoData();
+}
+
+void setupNtp() {
+	// Zeitserver ist der Router; Zeitzone Deutschland inkl. Sommerzeit.
+	// configTime() merkt sich nur den Zeiger, daher static.
+	static String ntpServer = WiFi.gatewayIP().toString();
+	settimeofday_cb([]() {
+		static bool first = true;
+		if (first) {
+			first = false;
+			Log("NTP: Zeit synchronisiert");
+		}
+	});
+	configTime("CET-1CEST,M3.5.0,M10.5.0/3", ntpServer.c_str());
+	Log("NTP-Server: " + ntpServer);
 }
 
 void setupArduinoOta() {
