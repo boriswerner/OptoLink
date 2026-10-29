@@ -299,10 +299,12 @@ def variants(raw):
 
 PRIORITY = {"Firmware": 0, "Addressen": 1, "Tabelle1 " + MODEL: 2}
 XLSX_NAME = "datenpunkte-vscotho1.xlsx"
-USER_COLUMNS = ("Bestätigter Typ", "Kommentar")
+USER_COLUMNS = ("Genutzt in ioBroker", "Bestätigter Typ", "Kommentar")
+SUPPLEMENT = "ergaenzungen.json"  # optional, lokal: {"0x0800": {"Kommentar": "...", ...}} füllt leere Zellen
 WIDTHS = {"Adresse": 9, "Länge": 7, "Klarname": 34, "Weitere Bezeichnungen": 34, "Quellen": 26,
           "MQTT-Topic (heute)": 22, "Wichtig (viessmann.cpp)": 12, "Rohwert (hex)": 20, "Vorgeschlagener Typ": 12, "Wert": 11,
-          "Bewertung": 12, "Hinweis": 50, "Varianten": 50, "Bestätigter Typ": 16, "Kommentar": 40}
+          "Bewertung": 12, "Hinweis": 50, "Varianten": 50, "Genutzt in ioBroker": 30, "Bestätigter Typ": 16,
+          "Kommentar": 60}
 
 
 def read_user_input(path):
@@ -323,10 +325,17 @@ def read_user_input(path):
 
 def write_xlsx(path, rows):
     """Excel-Datei mit festen Zelltypen: Wert als Zahl, Adressen/Rohwerte als Text.
-    Eigene Angaben aus einer vorhandenen Datei werden übernommen."""
+    Eigene Angaben aus einer vorhandenen Datei werden übernommen; Ergänzungen aus
+    ergaenzungen.json füllen nur Zellen, die dort noch leer sind."""
     import openpyxl
     from openpyxl.styles import Alignment, Font, PatternFill
     user = read_user_input(path)
+    supplement_path = os.path.join(os.path.dirname(path), SUPPLEMENT)
+    if os.path.exists(supplement_path):
+        for addr, values in json.load(open(supplement_path, encoding="utf-8")).items():
+            for k, v in values.items():
+                if k in USER_COLUMNS and not user.get(addr, {}).get(k):
+                    user.setdefault(addr, {})[k] = v
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = MODEL
@@ -399,7 +408,7 @@ def cmd_auswerten(args):
             "Rohwert (hex)": res.get("hex") or "",
             "Vorgeschlagener Typ": typ, "Wert": "" if value is None else value,
             "Bewertung": verdict, "Hinweis": " | ".join(hints), "Varianten": variants(raw),
-            "Bestätigter Typ": "", "Kommentar": ""})
+            "Genutzt in ioBroker": "", "Bestätigter Typ": "", "Kommentar": ""})
     path = os.path.join(OUT, XLSX_NAME)
     write_xlsx(path, rows)
     counts = {}
