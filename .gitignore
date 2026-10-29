@@ -5,6 +5,7 @@ include/secrets.h
 
 # Echte Messwerte der Heizung (Datenpunkt-Scan)
 docs/datenpunkte/lokal/
+__pycache__/
 
 # PlatformIO
 .pio/

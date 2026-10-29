@@ -138,19 +138,41 @@ void HandleScanStop() {
 	WebServer.send(200, "application/json", "{\"active\":false}");
 }
 
-// GET /api/raw?addr=0x0800&len=2  ->  {"id":n}; Ergebnis über /api/raw/result abholen
+// GET /api/raw?list=0x0800:2,0x0802:2,...  (bis zu SCAN_BATCH Einträge Adresse:Länge, Länge 1..9)
+//   -> {"id":n}; Ergebnis über /api/raw/result abholen
 void HandleRawRead() {
-	long addr = strtol(WebServer.arg("addr").c_str(), nullptr, 0);
-	long len = WebServer.arg("len").toInt();
-	if (!WebServer.hasArg("addr") || addr < 0 || addr > 0xFFFF || len < 1 || len > MAX_DP_LENGTH) {
-		WebServer.send(400, "text/plain", "addr (0..0xFFFF) und len (1..9) angeben");
+	uint16_t addrs[SCAN_BATCH];
+	uint8_t lens[SCAN_BATCH];
+	int count = 0;
+	String list = WebServer.arg("list");
+	int pos = 0;
+	while (pos < (int)list.length()) {
+		int comma = list.indexOf(',', pos);
+		if (comma < 0) {
+			comma = list.length();
+		}
+		String item = list.substring(pos, comma);
+		int colon = item.indexOf(':');
+		long addr = strtol(item.substring(0, colon).c_str(), nullptr, 0);
+		long len = colon > 0 ? item.substring(colon + 1).toInt() : 0;
+		if (count >= SCAN_BATCH || addr < 0 || addr > 0xFFFF || len < 1 || len > MAX_DP_LENGTH) {
+			WebServer.send(400, "text/plain", "list=Adresse:Länge,... (max. 16 Einträge, Länge 1..9)");
+			return;
+		}
+		addrs[count] = (uint16_t)addr;
+		lens[count] = (uint8_t)len;
+		count++;
+		pos = comma + 1;
+	}
+	if (count == 0) {
+		WebServer.send(400, "text/plain", "list=Adresse:Länge,... angeben");
 		return;
 	}
 	if (!isScanActive()) {
 		WebServer.send(409, "text/plain", "Scan nicht aktiv (POST /api/scan/start)");
 		return;
 	}
-	int id = scanRead((uint16_t)addr, (uint8_t)len);
+	int id = scanRead(addrs, lens, count);
 	if (id < 0) {
 		WebServer.send(409, "text/plain", "belegt, später erneut versuchen");
 		return;
@@ -160,13 +182,17 @@ void HandleRawRead() {
 
 void HandleRawResult() {
 	static const char* const STATES[] = {"idle", "busy", "done", "failed"};
-	char addr[8];
-	snprintf(addr, sizeof(addr), "0x%04X", getScanAddress());
-	String json = "{\"id\":" + String(getScanId()) +
-		",\"state\":\"" + STATES[getScanState()] +
-		"\",\"addr\":\"" + addr +
-		"\",\"len\":" + String(getScanLength()) +
-		",\"hex\":\"" + getScanHex() + "\"}";
+	String json = "{\"id\":" + String(getScanId()) + ",\"busy\":" + (scanBusy() ? "true" : "false") + ",\"results\":[";
+	for (int i = 0; i < getScanCount(); i++) {
+		char addr[8];
+		snprintf(addr, sizeof(addr), "0x%04X", getScanAddress(i));
+		if (i > 0) {
+			json += ',';
+		}
+		json += "{\"addr\":\"" + String(addr) + "\",\"len\":" + String(getScanLength(i)) +
+			",\"state\":\"" + STATES[getScanState(i)] + "\",\"hex\":\"" + getScanHex(i) + "\"}";
+	}
+	json += "]}";
 	WebServer.send(200, "application/json", json);
 }
 

@@ -2,7 +2,8 @@
 
 Schritte (Ausgaben in docs/datenpunkte/lokal/, per .gitignore ausgeschlossen, da echte Messwerte):
   python datenpunkte.py kandidaten <addressen.xlsx>   -> kandidaten.json
-  python datenpunkte.py scan [--host optolink]        -> scan.json (liest jede Adresse über /api/raw)
+  python datenpunkte.py scan [--host optolink] [--neu] -> scan.json (liest über /api/raw, 16 Adressen je
+                                                         Paket; ein abgebrochener Scan wird fortgesetzt)
   python datenpunkte.py auswerten                     -> datenpunkte-vscotho1.csv, uebersicht.md
 
 Abhängigkeit: openpyxl (nur für "kandidaten"). Der Scan liest nur, er schreibt nie in die Heizung.
@@ -132,25 +133,30 @@ def http(host, path, method="GET", timeout=10):
         return e.code, e.read().decode("utf-8", "replace")
 
 
-def read_raw(host, addr, length):
-    for _ in range(50):  # "belegt": reguläre Abfrage läuft evtl. noch
-        status, body = http(host, f"/api/raw?addr={addr}&len={length}")
+BATCH = 16  # SCAN_BATCH der Firmware
+
+
+def read_batch(host, parts):
+    """Liest bis zu BATCH (Adresse, Länge)-Paare in einem Rutsch. Liefert {Adresse: hex|None}."""
+    query = ",".join(f"0x{a:04X}:{n}" for a, n in parts)
+    for _ in range(100):  # "belegt": reguläre Abfrage läuft evtl. noch
+        status, body = http(host, f"/api/raw?list={query}")
         if status == 202:
             rid = json.loads(body)["id"]
             break
         if status == 409 and "belegt" in body:
             time.sleep(0.2)
             continue
-        raise RuntimeError(f"{addr}: HTTP {status} {body}")
+        raise RuntimeError(f"HTTP {status} {body}")
     else:
-        raise RuntimeError(f"{addr}: dauerhaft belegt")
-    deadline = time.time() + 8
+        raise RuntimeError("dauerhaft belegt")
+    deadline = time.time() + 5 * len(parts) + 10  # 5 s Timeout je Adresse, falls nichts antwortet
     while time.time() < deadline:
         res = json.loads(http(host, "/api/raw/result")[1])
-        if res["id"] == rid and res["state"] in ("done", "failed"):
-            return res["hex"] if res["state"] == "done" else None
-        time.sleep(0.05)
-    return None
+        if res["id"] == rid and not res["busy"]:
+            return {int(r["addr"], 16): (r["hex"] if r["state"] == "done" else None) for r in res["results"]}
+        time.sleep(0.1)
+    raise RuntimeError("keine Rückmeldung")
 
 
 def cmd_scan(args):
@@ -158,25 +164,40 @@ def cmd_scan(args):
     lengths = {}
     for c in cands:
         lengths[c["addr"]] = max(lengths.get(c["addr"], 0), c["len"] or 4)
-    jobs = sorted(lengths.items(), key=lambda kv: int(kv[0], 16))
+    path = os.path.join(OUT, "scan.json")
+    results = {}
+    if os.path.exists(path) and not args.neu:  # Zwischenstand fortsetzen
+        results = json.load(open(path, encoding="utf-8"))["werte"]
+    todo = sorted((a for a in lengths if a not in results), key=lambda a: int(a, 16))
+    # lange Blöcke in 9-Byte-Stücke zerlegen
+    parts = [(int(a, 16) + off, min(MAX_LEN, lengths[a] - off), a) for a in todo for off in range(0, lengths[a], MAX_LEN)]
+    print(f"{len(todo)} Adressen offen ({len(parts)} Lesevorgänge), {len(results)} schon gelesen", flush=True)
+
+    def save():
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"zeit": datetime.datetime.now().isoformat(timespec="seconds"), "werte": results}, f, indent=1)
+
     status, body = http(args.host, "/api/scan/start", "POST")
     if status != 200:
         sys.exit(f"Scan-Start fehlgeschlagen: HTTP {status} {body}")
-    results = {}
+    pieces = {}
     try:
-        for n, (addr, length) in enumerate(jobs, 1):
-            hexs = []
-            base = int(addr, 16)
-            for off in range(0, length, MAX_LEN):  # lange Blöcke in 9-Byte-Stücken
-                part = read_raw(args.host, "0x%04X" % (base + off), min(MAX_LEN, length - off))
-                hexs.append(part)
-            ok = all(h is not None for h in hexs)
-            results[addr] = {"len": length, "hex": "".join(hexs) if ok else None}
-            print(f"{n:3}/{len(jobs)} {addr} len {length}: {results[addr]['hex'] or 'FEHLER'}")
+        for i in range(0, len(parts), BATCH):
+            batch = parts[i:i + BATCH]
+            got = read_batch(args.host, [(p[0], p[1]) for p in batch])
+            for start, n, addr in batch:
+                pieces.setdefault(addr, []).append(got.get(start))
+            for addr in {p[2] for p in batch}:
+                expected = len(range(0, lengths[addr], MAX_LEN))
+                if len(pieces[addr]) == expected:
+                    ok = all(h is not None for h in pieces[addr])
+                    results[addr] = {"len": lengths[addr], "hex": "".join(pieces[addr]) if ok else None}
+            save()
+            failed = sum(1 for p in batch if got.get(p[0]) is None)
+            print(f"{min(i + BATCH, len(parts)):3}/{len(parts)} Lesevorgänge, in diesem Paket ohne Antwort: {failed}", flush=True)
     finally:
         http(args.host, "/api/scan/stop", "POST")
-    with open(os.path.join(OUT, "scan.json"), "w", encoding="utf-8") as f:
-        json.dump({"zeit": datetime.datetime.now().isoformat(timespec="seconds"), "werte": results}, f, indent=1)
+        save()
     print(f"{len(results)} Adressen gelesen, {sum(1 for r in results.values() if r['hex'] is None)} ohne Antwort")
 
 
@@ -257,9 +278,10 @@ def judge(typ, value, raw, names):
 def variants(raw):
     if not raw:
         return ""
-    v = [f"u8={raw[0]}"]
+    v = [f"u8={raw[0]}", f"s8={struct.unpack('<b', raw[:1])[0]}"]
     if len(raw) >= 2:
-        v += [f"u16={struct.unpack('<H', raw[:2])[0]}", f"s16/10={struct.unpack('<h', raw[:2])[0] / 10}"]
+        v += [f"u16={struct.unpack('<H', raw[:2])[0]}", f"s16/10={struct.unpack('<h', raw[:2])[0] / 10}",
+              f"u16/100={struct.unpack('<H', raw[:2])[0] / 100}"]
     if len(raw) >= 4:
         v += [f"u32={struct.unpack('<I', raw[:4])[0]}"]
     return " ".join(v)
@@ -334,6 +356,7 @@ def main():
     k.add_argument("xlsx")
     s = sub.add_parser("scan")
     s.add_argument("--host", default="optolink")
+    s.add_argument("--neu", action="store_true", help="Zwischenstand verwerfen und alles neu lesen")
     sub.add_parser("auswerten")
     args = p.parse_args()
     {"kandidaten": cmd_kandidaten, "scan": cmd_scan, "auswerten": cmd_auswerten}[args.cmd](args)
