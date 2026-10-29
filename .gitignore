@@ -3,6 +3,9 @@ include/secrets.h
 .env
 .env.local
 
+# Echte Messwerte der Heizung (Datenpunkt-Scan)
+docs/datenpunkte/lokal/
+
 # PlatformIO
 .pio/
 .vscode/.browse.c_cpp.db*
