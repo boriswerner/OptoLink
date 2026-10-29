@@ -23,6 +23,18 @@ void getVitoData();
 void loopVito();            // statt VitoWiFi.loop(): schließt außerdem fertige Zyklen ab
 void publishErrorState();   // MQTT "error" erneut senden (z. B. nach Neuverbindung)
 int getErrorState();        // 0/1, -1 vor dem ersten abgeschlossenen Zyklus
+
+// Scan: Adressen roh lesen (nur lesend), reguläre Abfrage pausiert, max. 10 Minuten
+enum ScanState { SCAN_IDLE, SCAN_BUSY, SCAN_DONE, SCAN_FAILED };
+void scanStart();
+void scanStop();
+bool isScanActive();
+int scanRead(uint16_t address, uint8_t length);   // Abfrage-ID oder -1 (Scan inaktiv/belegt)
+ScanState getScanState();
+int getScanId();
+const String& getScanHex();
+uint16_t getScanAddress();
+uint8_t getScanLength();
 String getErrorMessage(uint8_t code);
 
 class conv1_2_F : public DPType {

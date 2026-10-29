@@ -218,10 +218,84 @@ void finishCycle() {
     }
 }
 
+// ---- Scan: einzelne Adressen roh lesen (nur lesend), reguläre Abfrage pausiert ----
+
+// Fester Datenpunkt, dessen Adresse und Länge je Abfrage umgestellt werden.
+// Er wird aus der Liste von readAll() entfernt (der Destruktor von VitoWiFi 1.1.3
+// entfernt nur den ersten Eintrag zuverlässig, daher keine temporären Datenpunkte).
+class ScanDatapoint : public DPRaw {
+ public:
+    ScanDatapoint() : DPRaw("scan", "scan", 0) {
+        _dps.pop_back();
+    }
+};
+
+const unsigned long SCAN_MAX_MS = 10 * 60 * 1000UL;
+ScanDatapoint scanDp;
+bool scanActive = false;
+unsigned long scanStartedMillis = 0;
+ScanState scanState = SCAN_IDLE;
+int scanId = 0;
+String scanHex;
+
+void scanCallbackHandler(const IDatapoint& dp, DPValue value) {
+    char hex[2 * MAX_DP_LENGTH + 1] = {0};
+    value.getString(hex, sizeof(hex));
+    scanHex = hex;
+    scanState = SCAN_DONE;
+}
+
+void scanStart() {
+    if (!scanActive) {
+        Log("Scan gestartet, reguläre Abfrage pausiert");
+    }
+    scanActive = true;
+    scanStartedMillis = millis();
+}
+
+void scanStop() {
+    if (scanActive) {
+        Log("Scan beendet");
+    }
+    scanActive = false;
+}
+
+bool isScanActive() {
+    return scanActive;
+}
+
+int scanRead(uint16_t address, uint8_t length) {
+    if (!scanActive || scanState == SCAN_BUSY || VitoWiFi.queueSize() != 0) {
+        return -1;
+    }
+    scanDp.setAddress(address);
+    scanDp.setLength(length);
+    scanDp.setCallback(&scanCallbackHandler);
+    scanHex = "";
+    scanState = SCAN_BUSY;
+    scanId++;
+    VitoWiFi.readDatapoint(scanDp);
+    return scanId;
+}
+
+ScanState getScanState() { return scanState; }
+int getScanId() { return scanId; }
+const String& getScanHex() { return scanHex; }
+uint16_t getScanAddress() { return scanDp.getAddress(); }
+uint8_t getScanLength() { return scanDp.getLength(); }
+
 void loopVito() {
     VitoWiFi.loop();
     if (cycleRunning && VitoWiFi.queueSize() == 0) {
         finishCycle();
+    }
+    // Fehler/Timeout: VitoWiFi verwirft den Eintrag ohne Callback
+    if (scanState == SCAN_BUSY && VitoWiFi.queueSize() == 0) {
+        scanState = SCAN_FAILED;
+    }
+    if (scanActive && millis() - scanStartedMillis > SCAN_MAX_MS) {
+        Log("Scan nach 10 Minuten automatisch beendet");
+        scanActive = false;
     }
 }
 
@@ -260,6 +334,10 @@ void stoerungsmeldungCallbackHandler(const IDatapoint& dp, DPValue value) {
 }
 
 void getVitoData() {
+    if (scanActive) {
+        Log("Abfrage pausiert (Scan aktiv)");
+        return;
+    }
     if (cycleRunning) {
         finishCycle();      // voriger Zyklus ist nicht fertig geworden
     }

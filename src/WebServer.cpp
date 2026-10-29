@@ -11,6 +11,10 @@ void HandleRoot();
 void HandleStatus();
 void HandleLogs();
 void HandleRestart();
+void HandleScanStart();
+void HandleScanStop();
+void HandleRawRead();
+void HandleRawResult();
 
 void StartWebServer() {
 	Log("Start WebServer");
@@ -18,6 +22,10 @@ void StartWebServer() {
 	WebServer.on("/api/status", HTTP_GET, HandleStatus);
 	WebServer.on("/api/logs", HTTP_GET, HandleLogs);
 	WebServer.on("/api/restart", HTTP_POST, HandleRestart);
+	WebServer.on("/api/scan/start", HTTP_POST, HandleScanStart);
+	WebServer.on("/api/scan/stop", HTTP_POST, HandleScanStop);
+	WebServer.on("/api/raw", HTTP_GET, HandleRawRead);
+	WebServer.on("/api/raw/result", HTTP_GET, HandleRawResult);
 	WebServer.onNotFound([]() {
 		WebServer.send(404, "text/plain", "Nicht gefunden");
 	});
@@ -116,6 +124,50 @@ void HandleLogs() {
 	if (chunk.length() > 0) {
 		WebServer.sendContent(chunk);
 	}
+}
+
+// ---- Scan (nur lesend): siehe scanRead() in viessmann.cpp ----
+
+void HandleScanStart() {
+	scanStart();
+	WebServer.send(200, "application/json", "{\"active\":true}");
+}
+
+void HandleScanStop() {
+	scanStop();
+	WebServer.send(200, "application/json", "{\"active\":false}");
+}
+
+// GET /api/raw?addr=0x0800&len=2  ->  {"id":n}; Ergebnis über /api/raw/result abholen
+void HandleRawRead() {
+	long addr = strtol(WebServer.arg("addr").c_str(), nullptr, 0);
+	long len = WebServer.arg("len").toInt();
+	if (!WebServer.hasArg("addr") || addr < 0 || addr > 0xFFFF || len < 1 || len > MAX_DP_LENGTH) {
+		WebServer.send(400, "text/plain", "addr (0..0xFFFF) und len (1..9) angeben");
+		return;
+	}
+	if (!isScanActive()) {
+		WebServer.send(409, "text/plain", "Scan nicht aktiv (POST /api/scan/start)");
+		return;
+	}
+	int id = scanRead((uint16_t)addr, (uint8_t)len);
+	if (id < 0) {
+		WebServer.send(409, "text/plain", "belegt, später erneut versuchen");
+		return;
+	}
+	WebServer.send(202, "application/json", "{\"id\":" + String(id) + "}");
+}
+
+void HandleRawResult() {
+	static const char* const STATES[] = {"idle", "busy", "done", "failed"};
+	char addr[8];
+	snprintf(addr, sizeof(addr), "0x%04X", getScanAddress());
+	String json = "{\"id\":" + String(getScanId()) +
+		",\"state\":\"" + STATES[getScanState()] +
+		"\",\"addr\":\"" + addr +
+		"\",\"len\":" + String(getScanLength()) +
+		",\"hex\":\"" + getScanHex() + "\"}";
+	WebServer.send(200, "application/json", json);
 }
 
 void HandleRestart() {
