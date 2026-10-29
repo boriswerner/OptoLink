@@ -3,7 +3,7 @@
 Firmware für einen ESP8266, der über die optische Schnittstelle (Optolink) einer Viessmann-Heizungsregelung
 **Vitotronic (Gerätekennung VScotHO1)** Messwerte, Betriebszustände und Störmeldungen ausliest
 und an einen **MQTT-Broker** sendet. Fehlercodes werden dabei in deutsche Klartext-Meldungen übersetzt.
-Zusätzlich gibt es eine kleine Weboberfläche mit Log-Anzeige und Neustart-Knopf sowie Firmware-Updates per WLAN (OTA).
+Zusätzlich gibt es eine Weboberfläche mit allen Live-Werten, Status und Log sowie Firmware-Updates per WLAN (OTA).
 
 Der Zugriff ist **rein lesend**: Die Firmware schreibt keine Werte in die Heizung.
 
@@ -35,7 +35,8 @@ Der Zugriff ist **rein lesend**: Die Firmware schreibt keine Werte in die Heizun
 | WLAN | automatische Neuverbindung, kein Energiesparmodus, Neustart nach **5 Minuten** ohne WLAN |
 | Uhrzeit | per NTP vom Router, Zeitzone Deutschland mit Sommerzeit (für die Log-Zeitstempel) |
 | Störmeldungen | die letzten 3 Einträge der Fehlerhistorie werden dekodiert (Zeitstempel + Klartext) |
-| Weboberfläche | Port 80: Startseite, Live-Log, Neustart |
+| Verbindungsstatus | `optolink/error`: `1`, wenn ein ganzer Zyklus ohne Antwort der Heizung bleibt, sonst `0` |
+| Weboberfläche | Port 80: Live-Werte mit Zeitstempel, Status, Log, Neustart; JSON-Schnittstelle `/api/status` |
 | OTA-Update | ArduinoOTA, Hostname `optolink` |
 | Status-LED | blinkt, solange keine WLAN-Verbindung besteht |
 
@@ -63,16 +64,20 @@ OptoLink/
 ├── include/
 │   ├── secrets.example.h   Vorlage für Zugangsdaten (wird eingecheckt)
 │   ├── secrets.h           echte Zugangsdaten (NICHT eingecheckt, .gitignore)
-│   ├── viessmann.h         Deklarationen + eigener Datentyp DPPercent
+│   ├── viessmann.h         Deklarationen, Live-Werte, eigener Datentyp DPPercent
+│   ├── CycleMonitor.h      Bewertung der Abfragezyklen für optolink/error (ohne Arduino, nativ testbar)
 │   ├── mqtt.h              MQTT-Funktionen, Topic-Präfix
-│   ├── WebServer.h         HTML-/CSS-/JS-Bausteine der Weboberfläche
+│   ├── WebServer.h         Webserver-Schnittstellen
+│   ├── WebUi.h             Startseite (HTML/CSS/JS, im Flash)
 │   └── Logging.h
 ├── src/
 │   ├── main.cpp            setup()/loop(), WLAN, OTA, Timer
 │   ├── viessmann.cpp       Datenpunkt-Definitionen, Callbacks, Fehlercode-Übersetzung
 │   ├── mqtt.cpp            Broker-Verbindung, Publish
-│   ├── WebServer.cpp       HTTP-Handler
+│   ├── WebServer.cpp       HTTP-Handler, JSON-Schnittstelle
 │   └── Logging.cpp         Ringpuffer für Log-Meldungen
+├── test/test_cycle/        Unit-Tests für CycleMonitor (pio test -e native)
+├── .scratch/               lokale Tickets (siehe docs/agents/issue-tracker.md)
 └── lib/                    lokal mitgelieferte Bibliotheken
     ├── Time/               TimeLib (Zeitfunktionen für Log-Zeitstempel)
     └── Timer-master/       Timer-Bibliothek (Simon Monk / Jack Christensen) für periodische Aufrufe
@@ -102,12 +107,20 @@ Externe Bibliotheken (lädt PlatformIO automatisch): `bertmelis/VitoWiFi@^1.0.2`
 8. **VitoWiFi** wird eingerichtet (`setupVito()`): Die Bibliothek stellt `Serial` auf 4800 Baud, 8E2 um,
    registriert alle Datenpunkte und hängt die Callbacks an.
 9. Alle 60 s wird `getValues()` aufgerufen. Es läuft einmal sofort, protokolliert den freien Heap und stößt
-   `VitoWiFi.readAll()` an.
+   `VitoWiFi.readAll()` an. Ist die Warteschlange vom vorigen Zyklus noch nicht leer (Heizung antwortet nicht,
+   5 s Timeout je Datenpunkt), wird nichts neu eingereiht.
 
 ### Hauptschleife (`loop()`)
 
 Bei jedem Durchlauf werden der Reihe nach bedient: Webserver-Anfragen, OTA, MQTT-Client, die VitoWiFi-Warteschlange
-(sendet Anfragen an die Heizung und verarbeitet Antworten) und der Timer.
+(`loopVito()`: sendet Anfragen an die Heizung, verarbeitet Antworten und schließt einen fertigen Zyklus ab) und der Timer.
+
+### Verbindungsstatus `optolink/error`
+
+Jede Antwort der Heizung wird gezählt. Ein Zyklus endet, wenn die Warteschlange leer ist, spätestens aber mit dem
+nächsten `getValues()`. Gab es im Zyklus **keine einzige** Antwort, wird `error = 1` gesendet, sonst `0`.
+Gesendet wird nur bei einer Änderung, nach dem ersten Zyklus und nach jeder MQTT-Neuverbindung.
+Ein Ausfall fällt damit nach spätestens etwa 2 Minuten auf. Einzelne fehlgeschlagene Datenpunkte erscheinen nur im Web-Log.
 
 ### Vom Datenpunkt zur MQTT-Nachricht
 
@@ -129,6 +142,7 @@ Jede Veröffentlichung wird zusätzlich ins Log geschrieben.
 
 Topic = `optolink/` + Name (Präfix in [include/mqtt.h](include/mqtt.h), `topic_prefix`).
 Nachrichten werden **ohne Retain-Flag** gesendet.
+Zusätzlich zu den Datenpunkten gibt es `optolink/error` (`0`/`1`, siehe [Verbindungsstatus](#verbindungsstatus-optolinkerror)).
 
 **Datentypen (VitoWiFi):**
 
@@ -220,18 +234,32 @@ Feuerungsautomat …). Code `0x00` bedeutet „Regelbetrieb (kein Fehler)“, un
 
 ## Weboberfläche
 
-Erreichbar unter `http://<IP-des-ESP>/` (die IP steht im Log und im Router).
+Erreichbar unter `http://optolink/` oder `http://optolink.local/`.
 
-| Pfad | Funktion |
-|---|---|
-| `/` | Startseite mit Knöpfen „Logs“ und „Neustart“ |
-| `/Logs` | Log-Ansicht, aktualisiert sich alle 2 s |
-| `/getLogs` | Log als reiner Text (wird von `/Logs` abgefragt) |
-| `/restart` | startet den ESP neu |
+Die Startseite ([include/WebUi.h](include/WebUi.h)) ist eine einzelne Seite ohne externe Abhängigkeiten
+(funktioniert also auch ohne Internet), passt sich hell/dunkel der Systemeinstellung an und läuft auch auf dem Handy:
+
+- **Statusleiste:** Uhrzeit des Boards, Verbindung zur Heizung (`error`), letzte und nächste Abfrage,
+  MQTT-Status, WLAN-Pegel, freier Heap, Knopf **Neustart** (mit Sicherheitsabfrage)
+- **Live-Werte** gruppiert nach Temperaturen, Zuständen & Betriebsarten, Zählern und Störmeldungen,
+  mit Einheit (`°C`, `Std.`) und dem Zeitpunkt der letzten erfolgreichen Abfrage je Wert.
+  Werte, die älter als zwei Abfrageintervalle sind, werden gelb hervorgehoben.
+- **Log** (einklappbar)
+- Die Seite lädt ihre Daten ca. 3 s nach jeder Abfrage neu, die Uhr läuft im Browser weiter.
+
+Gruppe und Einheit ergeben sich aus dem zweiten Parameter der Datenpunkt-Definition in
+[src/viessmann.cpp](src/viessmann.cpp) (`temperature`, `state`, `counter`, `hours`, `error`).
+
+| Pfad | Methode | Funktion |
+|---|---|---|
+| `/` | GET | Startseite |
+| `/api/status` | GET | JSON: Uhrzeit, Laufzeit, Heap, WLAN, MQTT, `error`, Intervall, letzte/nächste Abfrage, alle Werte mit Gruppe und Zeitstempel |
+| `/api/logs` | GET | Log als Text |
+| `/api/restart` | POST | startet den ESP neu (ein GET bewirkt nichts) |
 
 Das Log ist ein Ringpuffer mit den letzten **120** Meldungen im RAM, nach einem Neustart ist es leer.
-Ein voller Abfragezyklus braucht ca. 90 Zeilen. Die Seiten werden stückweise gesendet, damit kein großer String
-den Heap fragmentiert.
+Ein voller Abfragezyklus braucht ca. 90 Zeilen. Seite, JSON und Log werden stückweise gesendet, damit kein großer
+String den Heap fragmentiert.
 
 ---
 
@@ -263,7 +291,17 @@ und die Werte eintragen:
 
 Fehlt `secrets.h`, bricht der Build mit „secrets.h: No such file or directory“ ab.
 
-### 3. Optional anpassen
+### 3. Tests
+
+Die Logik für `optolink/error` hat Unit-Tests, die ohne Hardware auf dem PC laufen:
+
+```
+pio test -e native
+```
+
+Dafür braucht es einen C++-Compiler auf dem PC (unter Windows z. B. MinGW-w64/GCC im `PATH`).
+
+### 4. Optional anpassen
 
 - **Topic-Präfix:** `topic_prefix` in [include/mqtt.h](include/mqtt.h) (Standard `optolink/`)
 - **Abfrageintervall:** `t.every(60000, getValues)` in [src/main.cpp](src/main.cpp) (Millisekunden)
