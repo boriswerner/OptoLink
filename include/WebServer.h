@@ -134,6 +134,8 @@ void StartWebServer();
 void HandleTest();
 
 
+String MainMenu();
+
 class WebServer
 {
 public:

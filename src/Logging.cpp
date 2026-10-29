@@ -36,3 +36,12 @@ String GetLogs() {
 	}
 	return response;
 }
+
+Logging::Logging()
+{
+}
+
+
+Logging::~Logging()
+{
+}

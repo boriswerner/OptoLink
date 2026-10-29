@@ -3,8 +3,8 @@
 #include <Logging.h>
 #include <VitoWiFi.h>
 
-extern VitoWiFi_setProtocol(P300);
-extern SoftwareSerial swSer;
+extern VitoWiFi_setProtocol(KW);
+//extern HardwareSerial swSer;
 void setupVito();
 
 void getVitoData();
@@ -12,17 +12,18 @@ String getErrorMessage(uint8_t code);
 
 class conv1_2_F : public DPType {
  public:
-  void encode(uint8_t* out, DPValue in) {
+  void encode(uint8_t* out, DPValue in) {  // encode can be left empty when the DP is only used for reading.
 
   }
   DPValue decode(const uint8_t* in) {
-    int32_t tmp = in[3] << 24 | in[2] << 16 | in[1] << 8 | in[0];
+    int32_t tmp = in[3] << 24 | in[2] << 16 | in[1] << 8 | in[0];  // keep endianess in mind! input is LSB first
     DPValue out(tmp / 2.0f);
     return out;
   }
-  const size_t getLength() const {
+  size_t getLength() const {
     return 1;
   }
 };
+
 
 typedef Datapoint<conv1_2_F> DPPercent;

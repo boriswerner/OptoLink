@@ -17,7 +17,10 @@ void StartWebServer() {
 	WebServer.on("/restart", HandleRestart);
 
 	WebServer.begin();
+
 }
+
+
 
 void ShowPage(String content, String script, String style) {
 	String page = FPSTR(HTTP_HEADER);
@@ -38,6 +41,10 @@ void ShowPage(String content, String script, String style) {
 	WebServer.send(200, "text/html", page);
 }
 
+String MainMenu() {
+	return "";
+}
+
 void HandleRoot() {
 	Serial1.println("HandleRoot");
 	String content = FPSTR(HTTP_MAIN);
@@ -45,6 +52,7 @@ void HandleRoot() {
 
 	ShowPage(content, FPSTR(HTTP_MAIN_SCRIPT), FPSTR(HTTP_STYLE));
 }
+
 
 void HandleLogs() {
 	Serial1.println("HandleGetLogs");
@@ -67,3 +75,12 @@ void HandleGetLogs() {
 	WebServer.send(200, "text/html", GetLogs());
 }
 
+WebServer::WebServer()
+{
+
+}
+
+
+WebServer::~WebServer()
+{
+}
