@@ -1,5 +1,6 @@
 #include "mqtt.h"
 #include "secrets.h"
+#include "viessmann.h"
 
 WiFiClient mqttWifiClient;
 PubSubClient mqttClient(mqttWifiClient);
@@ -42,6 +43,7 @@ void checkMqtt() {
         // Attempt to connect
         if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PW)) {
             Log("connected");
+            publishErrorState();    // Meldung könnte während des Abbruchs verloren gegangen sein
         
         } else {
             Log("MQTT: " + mqttStateText(mqttClient.state()));

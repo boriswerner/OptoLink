@@ -8,6 +8,9 @@ extern VitoWiFi_setProtocol(KW);
 void setupVito();
 
 void getVitoData();
+void loopVito();            // statt VitoWiFi.loop(): schließt außerdem fertige Zyklen ab
+void publishErrorState();   // MQTT "error" erneut senden (z. B. nach Neuverbindung)
+int getErrorState();        // 0/1, -1 vor dem ersten abgeschlossenen Zyklus
 String getErrorMessage(uint8_t code);
 
 class conv1_2_F : public DPType {

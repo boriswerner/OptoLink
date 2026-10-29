@@ -76,7 +76,7 @@ void loop() {
 	WebServer.handleClient();
 	ArduinoOTA.handle();
   mqttClient.loop();
-  VitoWiFi.loop();
+  loopVito();
   t.update();
   //delay(200);
   //wifiSerialLoop();

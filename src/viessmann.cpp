@@ -2,6 +2,7 @@
 #include <VitoWiFi.h>
 #include "mqtt.h"
 #include "Arduino.h"
+#include "CycleMonitor.h"
 
 VitoWiFi_setProtocol(KW);
 //HardwareSerial swSer;
@@ -162,12 +163,44 @@ void setupVito() {
     // stoerungsmeldung10.setLength(9);
 }
 
+CycleMonitor cycleMonitor;
+bool cycleRunning = false;
+
+void publishErrorState() {
+    int state = cycleMonitor.state();
+    if (state != CycleMonitor::NOTHING) {
+        publishMqtt("error", state == 1 ? "1" : "0");
+    }
+}
+
+int getErrorState() {
+    return cycleMonitor.state();
+}
+
+void finishCycle() {
+    cycleRunning = false;
+    int state = cycleMonitor.finishCycle();
+    if (state != CycleMonitor::NOTHING) {
+        publishErrorState();
+        Log(state == 1 ? "Heizung antwortet nicht (error=1)" : "Heizung antwortet (error=0)");
+    }
+}
+
+void loopVito() {
+    VitoWiFi.loop();
+    if (cycleRunning && VitoWiFi.queueSize() == 0) {
+        finishCycle();
+    }
+}
+
 void tempCallbackHandler(const IDatapoint& dp, DPValue value) {
+    cycleMonitor.onSuccess();
     publishMqtt(dp.getName(),(char*)String(value.getFloat()).c_str());
   Log("tempCallbackHandler: " + String(dp.getName()) + " " + String(value.getFloat()).c_str());
 }
 
 void globalCallbackHandler(const IDatapoint& dp, DPValue value) {
+  cycleMonitor.onSuccess();
   char value_str[15] = {0};
   value.getString(value_str, sizeof(value_str));
   publishMqtt(dp.getName(),value_str);
@@ -175,6 +208,7 @@ void globalCallbackHandler(const IDatapoint& dp, DPValue value) {
 }
 
 void stoerungsmeldungCallbackHandler(const IDatapoint& dp, DPValue value) {
+    cycleMonitor.onSuccess();
     char dpBuffer[128];
     value.getString(dpBuffer,128);
     //Log((char*) test); // 9e2022051507133625
@@ -193,8 +227,17 @@ void stoerungsmeldungCallbackHandler(const IDatapoint& dp, DPValue value) {
 }
 
 void getVitoData() {
-    VitoWiFi.readAll();
-    
+    if (cycleRunning) {
+        finishCycle();      // voriger Zyklus ist nicht fertig geworden
+    }
+    // Antwortet die Heizung nicht, dauert ein Durchlauf (5 s Timeout je Datenpunkt) länger als
+    // das Intervall; dann nicht noch einmal alles einreihen, sonst staut sich die Warteschlange.
+    if (VitoWiFi.queueSize() == 0) {
+        VitoWiFi.readAll();
+    } else {
+        Log("Abfrage übersprungen, Warteschlange noch nicht leer");
+    }
+    cycleRunning = true;
 }
 
 String getErrorMessage(uint8_t errorCode) {
