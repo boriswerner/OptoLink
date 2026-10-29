@@ -14,8 +14,27 @@ void publishMqtt(String topic, const char* payload) {
     mqttClient.publish((topic_prefix + topic).c_str(), payload);
 }
 
+String mqttStateText(int state) {
+    switch (state) {
+        case MQTT_CONNECTION_TIMEOUT:      return "connection timeout";
+        case MQTT_CONNECTION_LOST:         return "connection lost";
+        case MQTT_CONNECT_FAILED:          return "connect failed";
+        case MQTT_DISCONNECTED:            return "disconnected";
+        case MQTT_CONNECT_BAD_PROTOCOL:    return "bad protocol";
+        case MQTT_CONNECT_BAD_CLIENT_ID:   return "bad client id";
+        case MQTT_CONNECT_UNAVAILABLE:     return "unavailable";
+        case MQTT_CONNECT_BAD_CREDENTIALS: return "bad credentials";
+        case MQTT_CONNECT_UNAUTHORIZED:    return "unauthorized";
+        default:                           return String(state);
+    }
+}
+
 void checkMqtt() {
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
     if (!mqttClient.connected()) {
+        Log("MQTT: " + mqttStateText(mqttClient.state()));
         Log("Attempting MQTT connection... ");
         // Create a random client ID
         String clientId = "optolink";
@@ -25,7 +44,7 @@ void checkMqtt() {
             Log("connected");
         
         } else {
-            Log(String(mqttClient.state()));
+            Log("MQTT: " + mqttStateText(mqttClient.state()));
         }
     }
 }

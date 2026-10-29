@@ -56,7 +56,7 @@ void setup() {
 	t.every(10000, checkWifi);
 
   setupMqtt();
-  t.every(60000,checkMqtt);
+  t.every(10000,checkMqtt);
   checkMqtt();
 
 	IPAddress HTTPS_ServerIP = WiFi.localIP(); // Obtain the IP of the Server
