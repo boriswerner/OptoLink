@@ -5,7 +5,19 @@
 
 extern VitoWiFi_setProtocol(KW);
 //extern HardwareSerial swSer;
+const unsigned long VALUES_INTERVAL_MS = 60000;	// Abfrageintervall
+
+// Letzter Wert eines Datenpunkts für die Weboberfläche
+struct LiveValue {
+  const IDatapoint* dp;
+  String value;       // Anzeigetext ("" = noch nie gelesen)
+  time_t timestamp;   // letzte erfolgreiche Abfrage
+};
+
 void setupVito();
+const std::vector<LiveValue>& getLiveValues();
+time_t getLastCycleTime();
+long getNextCycleInMs();
 
 void getVitoData();
 void loopVito();            // statt VitoWiFi.loop(): schließt außerdem fertige Zyklen ab

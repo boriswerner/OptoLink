@@ -7,43 +7,43 @@
 VitoWiFi_setProtocol(KW);
 //HardwareSerial swSer;
 //DPCountS geraeteKennung("GeraeteKennung", "boiler", 0x00F8);
-    DPTemp x2900("x2900", "boiler", 0x2900); //Vorlauftemperatur-Istwert?
-DPTemp aussenTemp("AußenTemp", "boiler", 0x0800);
-    DPTemp x0818("x0818", "boiler", 0x0818); //Rücklauftemperatur (17A) - Tiefpass?
+    DPTemp x2900("x2900", "temperature", 0x2900); //Vorlauftemperatur-Istwert?
+DPTemp aussenTemp("AußenTemp", "temperature", 0x0800);
+    DPTemp x0818("x0818", "temperature", 0x0818); //Rücklauftemperatur (17A) - Tiefpass?
 DPTemp outsideTemp("aussenTemperaturTiefpass", "temperature", 0x5525); // 2-Byte, -60..60
-    DPTempS partyTemperaturSoll("partyTemperaturSoll", "boiler", 0x2308);
+    DPTempS partyTemperaturSoll("partyTemperaturSoll", "temperature", 0x2308);
 DPTemp outsideTempSmooth("aussenTemperaturGedaempft", "temperature", 0x5527); // 2-Byte, -60..60
-    DPMode ferienbetrieb2("ferienbetrieb2", "boiler", 0x2303);
-DPTemp vorlaufSollTemp2("VorlaufSollTemp2", "boiler", 0x2544);//0 
-    DPMode solarpumpe("Solarpumpe", "boiler", 0x6552);//0 
-DPMode heizkennlinieNiveau("heizkennlinieNiveau", "boiler", 0x27D4);
-    DPTempS redRaumtemperaturSoll("redRaumtemperaturSoll", "boiler", 0x2307);
-DPCoP heizkennlinieNeigung("heizkennlinieNeigung", "boiler", 0x27D3);
+    DPMode ferienbetrieb2("ferienbetrieb2", "state", 0x2303);
+DPTemp vorlaufSollTemp2("VorlaufSollTemp2", "temperature", 0x2544);//0 
+    DPMode solarpumpe("Solarpumpe", "state", 0x6552);//0 
+DPMode heizkennlinieNiveau("heizkennlinieNiveau", "state", 0x27D4);
+    DPTempS redRaumtemperaturSoll("redRaumtemperaturSoll", "temperature", 0x2307);
+DPCoP heizkennlinieNeigung("heizkennlinieNeigung", "state", 0x27D3);
 
 
-    DPTempS raumtemperaturSoll("raumtemperaturSoll", "boiler", 0x2306);
+    DPTempS raumtemperaturSoll("raumtemperaturSoll", "temperature", 0x2306);
 // Currently calculated low pass outside temperature, Time constant 30 minutes.
 // 0x0800 2-byte ATS Aussentemperatur (Sensor 1)
 // Kesseltemperatur Tiefpass [R]
 DPTemp boilerTemp("boilerTemp", "temperature", 0x0810); // 2-Byte, 0..127
 // WW-Temperatur (Speicher) [R]
-    DPMode nachladeunterdrueckung("Nachladeunterdrückung", "boiler", 0x6551);//0 
-DPTemp ladespeicherObenTemp("LadespeicherObenTemp", "boiler", 0x0812);
-    DPCount waermemenge("Wärmemenge", "boiler", 0x6560);//0 
-DPTemp ladespeicherUntenTemp("LadespeicherUntenTemp", "boiler", 0x0814);
+    DPMode nachladeunterdrueckung("Nachladeunterdrückung", "state", 0x6551);//0 
+DPTemp ladespeicherObenTemp("LadespeicherObenTemp", "temperature", 0x0812);
+    DPCount waermemenge("Wärmemenge", "counter", 0x6560);//0 
+DPTemp ladespeicherUntenTemp("LadespeicherUntenTemp", "temperature", 0x0814);
 // Raumtemperatur A1M1 Tiefpass RTS [R]
     DPTemp roomTemp("heizkreisRaumtemperatur", "temperature", 0x0896); // 2-Byte, 0..127
 // Abgastemperatur Tiefpass AGTS [R]
 DPTemp agtsTemp("abgastemperaturTiefpass", "temperature", 0x0816); // 2-Byte
     DPTemp vltsTemp("vorlauftemperatur", "temperature", 0x080C); // 2-Byte
-DPTemp abgasTemp("AbgasTempOderRuecklauf", "boiler", 0x0808);
+DPTemp abgasTemp("AbgasTempOderRuecklauf", "temperature", 0x0808);
 // Rücklauftemperatur (17A) [R]
     DPTemp rltsTemp("rücklauftemperatur17A", "temperature", 0x080A); // 2-Byte
 // Vorlauftemperatur (17B) [R]
 // 0x0802 2-byte KTS Kesseltemperatur (Sensor 3)
-DPTemp kesselIstTemp("KesselIstTemp", "boiler", 0x0802);
-    DPMode currentOperatingMode("currentOperatingMode", "operation", 0x2500); // 1-Byte, 0..3
-DPTemp kesselSollTemp("KesselSollTemp", "boiler", 0x555A);
+DPTemp kesselIstTemp("KesselIstTemp", "temperature", 0x0802);
+    DPMode currentOperatingMode("currentOperatingMode", "state", 0x2500); // 1-Byte, 0..3
+DPTemp kesselSollTemp("KesselSollTemp", "temperature", 0x555A);
 //-// DPTempS kesselSollTempS("KesselSollTempS", "boiler", 0x555A);
 //-// DPCountS kesselSollCountS("kesselSollCountS", "boiler", 0x555A);
 // Betriebsstunden Stufe 1
@@ -58,24 +58,24 @@ DPTemp kesselSollTemp("KesselSollTemp", "boiler", 0x555A);
 // DPStat storePump("storePump", "pump", 0x0845);
 // Zirkulationspumpe [R]
 // DPStat circuitPump("circuitPump", "pump", 0x0846);
-    DPHours betriebsstunden("Betriebsstunden", "boiler", 0x6568);
+    DPHours betriebsstunden("Betriebsstunden", "hours", 0x6568);
 
-DPTempS warmwasserSollTemp("WarmwasserSollTemp", "boiler", 0x6300);
+DPTempS warmwasserSollTemp("WarmwasserSollTemp", "temperature", 0x6300);
 
-    DPTemp kollektorTemp("KollektorTemp", "boiler", 0x6564);//3276,7 
-DPTemp vorlaufSollTemp("VorlaufSollTemp", "boiler", 0x3544);//0 
-    DPStat aim1Pump("a1m1Pump", "pump", 0x2906);
-DPTemp warmwasserIstTemp("WarmwasserIstTemp", "boiler", 0x0804);
-    DPTemp vorlaufIstTemp("VorlaufIstTemp", "boiler", 0x3900);//0 
+    DPTemp kollektorTemp("KollektorTemp", "temperature", 0x6564);//3276,7 
+DPTemp vorlaufSollTemp("VorlaufSollTemp", "temperature", 0x3544);//0 
+    DPStat aim1Pump("a1m1Pump", "state", 0x2906);
+DPTemp warmwasserIstTemp("WarmwasserIstTemp", "temperature", 0x0804);
+    DPTemp vorlaufIstTemp("VorlaufIstTemp", "temperature", 0x3900);//0 
 // DPTemp solarspeicherTemp("SolarspeicherTemp", "boiler", 0x6566);//3276,7 
 
 // DPCount solartagesertrag("Solartagesertrag", "boiler", 0xCF30);//4294967295
 // DPMode solarinfo("Solarinfo", "boiler", 0x7754);//0
 // DPMode speicherladepumpe("Speicherladepumpe", "boiler", 0x6513);//0
-DPMode betriebsart("Betriebsart", "boiler", 0x3323);//2
-    DPMode ferienbetrieb("ferienbetrieb", "boiler", 0x2535);
-DPMode betriebsart2("Betriebsart2", "boiler", 0x2323);//2
-    DPMode sparbetrieb("Sparbetrieb", "boiler", 0x3302);
+DPMode betriebsart("Betriebsart", "state", 0x3323);//2
+    DPMode ferienbetrieb("ferienbetrieb", "state", 0x2535);
+DPMode betriebsart2("Betriebsart2", "state", 0x2323);//2
+    DPMode sparbetrieb("Sparbetrieb", "state", 0x3302);
 //-// DPHours brennerlaufzeit("Brennerlaufzeit", "boiler", 0x0886);
 //-// DPMode brennerstoerung("Brennerstörung", "boiler", 0x0883);//0
 
@@ -87,9 +87,9 @@ DPMode betriebsart2("Betriebsart2", "boiler", 0x2323);//2
 // DPMode umwaelzpumpe("Umwälzpumpe", "boiler", 0x7660);//1
 // DPMode heizkreispumpe("Heizkreispumpe", "boiler", 0x3906);//0
 //-// DPMode stoerung("Störung", "boiler", 0x0A82);//0
-DPRaw stoerungsmeldung1("Stoerungsmeldung1", "boiler", 0x7507); //25.10.22 02:20:54 Uhr#Unbekannter Fehler#a8
-DPRaw stoerungsmeldung2("Stoerungsmeldung2", "boiler", 0x7510); //01.10.22 06:13:22 Uhr#Unbekannter Fehler#e9
-DPRaw stoerungsmeldung3("Stoerungsmeldung3", "boiler", 0x7519);
+DPRaw stoerungsmeldung1("Stoerungsmeldung1", "error", 0x7507); //25.10.22 02:20:54 Uhr#Unbekannter Fehler#a8
+DPRaw stoerungsmeldung2("Stoerungsmeldung2", "error", 0x7510); //01.10.22 06:13:22 Uhr#Unbekannter Fehler#e9
+DPRaw stoerungsmeldung3("Stoerungsmeldung3", "error", 0x7519);
 // DPRaw stoerungsmeldung4("Stoerungsmeldung4", "boiler", 0x7522);
 // DPRaw stoerungsmeldung5("Stoerungsmeldung5", "boiler", 0x752B);
 // DPRaw stoerungsmeldung6("Stoerungsmeldung6", "boiler", 0x7534);
@@ -123,6 +123,7 @@ void globalCallbackHandler(const IDatapoint& dp, DPValue value);
 void stoerungsmeldungCallbackHandler(const IDatapoint& dp, DPValue value);
 
 ErrorLogPrint vitoErrorLog;
+std::vector<LiveValue> liveValues;
 
 void setupVito() {
     VitoWiFi.setup(&Serial);
@@ -161,10 +162,41 @@ void setupVito() {
     // stoerungsmeldung8.setLength(9);
     // stoerungsmeldung9.setLength(9);
     // stoerungsmeldung10.setLength(9);
+
+    liveValues.reserve(IDatapoint::getCollection().size());
+    for (IDatapoint* dp : IDatapoint::getCollection()) {
+        liveValues.push_back({dp, "", 0});
+    }
 }
 
 CycleMonitor cycleMonitor;
 bool cycleRunning = false;
+time_t lastCycleTime = 0;
+unsigned long lastCycleMillis = 0;
+
+const std::vector<LiveValue>& getLiveValues() {
+    return liveValues;
+}
+
+time_t getLastCycleTime() {
+    return lastCycleTime;
+}
+
+long getNextCycleInMs() {
+    return (long)VALUES_INTERVAL_MS - (long)(millis() - lastCycleMillis);
+}
+
+// Von allen Callbacks aufgerufen: zählt die Antwort und merkt sich den Wert für die Weboberfläche
+void valueReceived(const IDatapoint& dp, const String& text) {
+    cycleMonitor.onSuccess();
+    for (auto& lv : liveValues) {
+        if (lv.dp == &dp) {
+            lv.value = text;
+            lv.timestamp = time(nullptr);
+            return;
+        }
+    }
+}
 
 void publishErrorState() {
     int state = cycleMonitor.state();
@@ -194,21 +226,20 @@ void loopVito() {
 }
 
 void tempCallbackHandler(const IDatapoint& dp, DPValue value) {
-    cycleMonitor.onSuccess();
+    valueReceived(dp, String(value.getFloat(), 1));
     publishMqtt(dp.getName(),(char*)String(value.getFloat()).c_str());
   Log("tempCallbackHandler: " + String(dp.getName()) + " " + String(value.getFloat()).c_str());
 }
 
 void globalCallbackHandler(const IDatapoint& dp, DPValue value) {
-  cycleMonitor.onSuccess();
   char value_str[15] = {0};
   value.getString(value_str, sizeof(value_str));
+  valueReceived(dp, value_str);
   publishMqtt(dp.getName(),value_str);
   Log("globalCallbackHandler: " + String(dp.getName()) + " " + String(value_str));
 }
 
 void stoerungsmeldungCallbackHandler(const IDatapoint& dp, DPValue value) {
-    cycleMonitor.onSuccess();
     char dpBuffer[128];
     value.getString(dpBuffer,128);
     //Log((char*) test); // 9e2022051507133625
@@ -223,7 +254,9 @@ void stoerungsmeldungCallbackHandler(const IDatapoint& dp, DPValue value) {
     String errorMessage = getErrorMessage(errorCode);
     Log(String(dp.getName()) + " " + errorMessage);
     
-    publishMqtt(dp.getName(), (timeString + "#" + errorMessage + "#" + dpString.substring(0,2)).c_str() );
+    String payload = timeString + "#" + errorMessage + "#" + dpString.substring(0,2);
+    valueReceived(dp, payload);
+    publishMqtt(dp.getName(), payload.c_str());
 }
 
 void getVitoData() {
@@ -238,6 +271,8 @@ void getVitoData() {
         Log("Abfrage übersprungen, Warteschlange noch nicht leer");
     }
     cycleRunning = true;
+    lastCycleTime = time(nullptr);
+    lastCycleMillis = millis();
 }
 
 String getErrorMessage(uint8_t errorCode) {
