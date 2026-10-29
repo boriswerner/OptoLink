@@ -31,6 +31,7 @@ DPTemp boilerTemp("boilerTemp", "temperature", 0x0810); // 2-Byte, 0..127
 DPTemp ladespeicherObenTemp("LadespeicherObenTemp", "temperature", 0x0812);
     //-// DPCount waermemenge("Wärmemenge", "counter", 0x6560);//0  // entfernt: Wärmemenge Solar = 0, kein Solarmodul erkennbar
 DPTemp ladespeicherUntenTemp("LadespeicherUntenTemp", "temperature", 0x0814);
+DPTemp ladespeicherUntenRohTemp("LadespeicherUntenRohTemp", "temperature", 0x0806); // Speicher unten, ungefiltert
 // Raumtemperatur A1M1 Tiefpass RTS [R]
     //-// DPTemp roomTemp("heizkreisRaumtemperatur", "temperature", 0x0896); // 2-Byte, 0..127  // entfernt: Raumtemperatur, konstant 20,0 (Ersatzwert), kein Raumfühler
 // Abgastemperatur Tiefpass AGTS [R]
@@ -50,7 +51,7 @@ DPTemp kesselSollTemp("KesselSollTemp", "temperature", 0x555A);
 //-// DPHours boilerRunHours("runHours", "burner", 0x08A7); // 4-Byte, 0..1150000
 // Brennerstarts [R]
 //DPCount boilerRuns("starts", "burner", 0x088A); // 4-Byte, 0..1150000
-//-// DPCount brennerstarts("Brennerstarts", "boiler", 0x088A);
+DPCount brennerstarts("Brennerstarts", "counter", 0x088A);
 // aktuelle Betriebsart A1M1 [R]; 0=Standby mode, 1=Reduced mode, 2=Standard mode, 3=Standard mode
 // Heizkreispumpe A1M1 [R]
 
@@ -72,31 +73,33 @@ DPTemp warmwasserIstTemp("WarmwasserIstTemp", "temperature", 0x0804);
 // DPCount solartagesertrag("Solartagesertrag", "boiler", 0xCF30);//4294967295
 // DPMode solarinfo("Solarinfo", "boiler", 0x7754);//0
 // DPMode speicherladepumpe("Speicherladepumpe", "boiler", 0x6513);//0
-DPMode betriebsart("Betriebsart", "state", 0x3323);//2
+//-// DPMode betriebsart("Betriebsart", "state", 0x3323);//2  // entfernt: Betriebsart M2, kein Heizkreis M2 (A1 ist Betriebsart2)
     DPMode ferienbetrieb("ferienbetrieb", "state", 0x2535);
 DPMode betriebsart2("Betriebsart2", "state", 0x2323);//2
     //-// DPMode sparbetrieb("Sparbetrieb", "state", 0x3302);  // entfernt: Sparbetrieb M2, kein Heizkreis M2 (A1 wäre 0x2302)
-//-// DPHours brennerlaufzeit("Brennerlaufzeit", "boiler", 0x0886);
-//-// DPMode brennerstoerung("Brennerstörung", "boiler", 0x0883);//0
+    DPMode sparbetrieb2("Sparbetrieb2", "state", 0x2302); // Sparbetrieb A1M1
+DPHours brennerlaufzeit("Brennerlaufzeit", "hours", 0x0886);
+DPMode brennerstoerung("Brennerstörung", "state", 0x0883);//0
 
 // DPCountS brennerstatus("Brennerstatus", "boiler", 0xA38F);//0
-//-// DPPercent brennerleistung("Brennerleistung", "boiler", 0xA38F);//0
-// DPMode flamme("Flamme", "boiler", 0x55D3);//0
+DPPercent brennerleistung("Brennerleistung", "state", 0xA38F); // 1 Byte, 0..100 %
+DPMode flamme("Flamme", "state", 0x55D3); // Bedeutung nicht bestätigt
 // DPMode flowswitch("Flowswitch", "boiler", 0x0883);//0
-// DPMode umschaltventil("Umschaltventil", "boiler", 0x0A10);//1
+DPMode umschaltventil("Umschaltventil", "state", 0x0A10); // laut Original-Repo 0=undefiniert, 1=Heizen, 2=Mittelstellung, 3=Warmwasser
+DPMode pumpendrehzahl("Pumpendrehzahl", "state", 0x0A3C); // Solldrehzahl interne Pumpe in %
 // DPMode umwaelzpumpe("Umwälzpumpe", "boiler", 0x7660);//1
 // DPMode heizkreispumpe("Heizkreispumpe", "boiler", 0x3906);//0
 //-// DPMode stoerung("Störung", "boiler", 0x0A82);//0
 DPRaw stoerungsmeldung1("Stoerungsmeldung1", "error", 0x7507); //25.10.22 02:20:54 Uhr#Unbekannter Fehler#a8
 DPRaw stoerungsmeldung2("Stoerungsmeldung2", "error", 0x7510); //01.10.22 06:13:22 Uhr#Unbekannter Fehler#e9
 DPRaw stoerungsmeldung3("Stoerungsmeldung3", "error", 0x7519);
-// DPRaw stoerungsmeldung4("Stoerungsmeldung4", "boiler", 0x7522);
-// DPRaw stoerungsmeldung5("Stoerungsmeldung5", "boiler", 0x752B);
-// DPRaw stoerungsmeldung6("Stoerungsmeldung6", "boiler", 0x7534);
-// DPRaw stoerungsmeldung7("Stoerungsmeldung7", "boiler", 0x753D);
-// DPRaw stoerungsmeldung8("Stoerungsmeldung8", "boiler", 0x7546);
-// DPRaw stoerungsmeldung9("Stoerungsmeldung9", "boiler", 0x754F);
-// DPRaw stoerungsmeldung10("Stoerungsmeldung10", "boiler", 0x7558);
+DPRaw stoerungsmeldung4("Stoerungsmeldung4", "error", 0x7522);
+DPRaw stoerungsmeldung5("Stoerungsmeldung5", "error", 0x752B);
+DPRaw stoerungsmeldung6("Stoerungsmeldung6", "error", 0x7534);
+DPRaw stoerungsmeldung7("Stoerungsmeldung7", "error", 0x753D);
+DPRaw stoerungsmeldung8("Stoerungsmeldung8", "error", 0x7546);
+DPRaw stoerungsmeldung9("Stoerungsmeldung9", "error", 0x754F);
+DPRaw stoerungsmeldung10("Stoerungsmeldung10", "error", 0x7558);
 
 /*https://github.com/Ixtalo/MyVitotronicLogger/blob/master/vitowifimqtt/src/vitowifimqtt.ino
 room temp
@@ -145,23 +148,24 @@ void setupVito() {
     stoerungsmeldung2.setCallback(&stoerungsmeldungCallbackHandler);
     stoerungsmeldung3.setCallback(&stoerungsmeldungCallbackHandler);
     stoerungsmeldung1.setCallback(&stoerungsmeldungCallbackHandler);
-    // stoerungsmeldung4.setCallback(&stoerungsmeldungCallbackHandler);
-    // stoerungsmeldung5.setCallback(&stoerungsmeldungCallbackHandler);
-    // stoerungsmeldung6.setCallback(&stoerungsmeldungCallbackHandler);
-    // stoerungsmeldung7.setCallback(&stoerungsmeldungCallbackHandler);
-    // stoerungsmeldung8.setCallback(&stoerungsmeldungCallbackHandler);
-    // stoerungsmeldung9.setCallback(&stoerungsmeldungCallbackHandler);
-    // stoerungsmeldung10.setCallback(&stoerungsmeldungCallbackHandler);
+    stoerungsmeldung4.setCallback(&stoerungsmeldungCallbackHandler);
+    stoerungsmeldung5.setCallback(&stoerungsmeldungCallbackHandler);
+    stoerungsmeldung6.setCallback(&stoerungsmeldungCallbackHandler);
+    stoerungsmeldung7.setCallback(&stoerungsmeldungCallbackHandler);
+    stoerungsmeldung8.setCallback(&stoerungsmeldungCallbackHandler);
+    stoerungsmeldung9.setCallback(&stoerungsmeldungCallbackHandler);
+    stoerungsmeldung10.setCallback(&stoerungsmeldungCallbackHandler);
     stoerungsmeldung2.setLength(9);
     stoerungsmeldung3.setLength(9);
     stoerungsmeldung1.setLength(9);
-    // stoerungsmeldung4.setLength(9);
-    // stoerungsmeldung5.setLength(9);
-    // stoerungsmeldung6.setLength(9);
-    // stoerungsmeldung7.setLength(9);
-    // stoerungsmeldung8.setLength(9);
-    // stoerungsmeldung9.setLength(9);
-    // stoerungsmeldung10.setLength(9);
+    stoerungsmeldung4.setLength(9);
+    stoerungsmeldung5.setLength(9);
+    stoerungsmeldung6.setLength(9);
+    stoerungsmeldung7.setLength(9);
+    stoerungsmeldung8.setLength(9);
+    stoerungsmeldung9.setLength(9);
+    stoerungsmeldung10.setLength(9);
+    ladespeicherUntenRohTemp.setCallback(&tempCallbackHandler);
 
     liveValues.reserve(IDatapoint::getCollection().size());
     for (IDatapoint* dp : IDatapoint::getCollection()) {

@@ -47,8 +47,8 @@ class conv1_2_F : public DPType {
 
   }
   DPValue decode(const uint8_t* in) {
-    int32_t tmp = in[3] << 24 | in[2] << 16 | in[1] << 8 | in[0];  // keep endianess in mind! input is LSB first
-    DPValue out(tmp / 2.0f);
+    // 1 Byte in halben Prozent (0..200 = 0..100 %); bisher wurden 4 Bytes gelesen, 3 davon ausserhalb des Datenpunkts
+    DPValue out(in[0] / 2.0f);
     return out;
   }
   size_t getLength() const {

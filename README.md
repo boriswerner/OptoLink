@@ -131,7 +131,7 @@ falls keiner gesetzt ist, den globalen Callback auf:
 | Callback | Verwendet für | MQTT-Payload |
 |---|---|---|
 | `tempCallbackHandler` | ausgewählte Temperaturen (siehe Tabelle) | Gleitkommazahl mit **2** Nachkommastellen, z. B. `21.30` |
-| `stoerungsmeldungCallbackHandler` | Störmeldungen 1–3 | `TT.MM.JJ hh:mm:ss Uhr#<Meldung>#<Code hex>` |
+| `stoerungsmeldungCallbackHandler` | Störmeldungen 1–10 | `TT.MM.JJ hh:mm:ss Uhr#<Meldung>#<Code hex>` |
 | `globalCallbackHandler` | alle übrigen Datenpunkte | Textdarstellung je nach Typ (siehe unten), max. 14 Zeichen |
 
 Jede Veröffentlichung wird zusätzlich ins Log geschrieben.
@@ -154,6 +154,7 @@ Zusätzlich zu den Datenpunkten gibt es `optolink/error` (`0`/`1`, siehe [Verbin
 | `DPCount` | 4 | Ganzzahl ohne Vorzeichen | `123456` |
 | `DPHours` | 4 | Sekunden / 3600 | `1234.5` |
 | `DPCoP` | 1 | Wert / 10 | `1.4` |
+| `DPPercent` (eigener Typ) | 1 | Wert / 2 | `42.5` |
 | `DPRaw` | n | Rohbytes | Hex-String |
 
 **Datenpunkte** (Adresse = Speicheradresse in der Vitotronic):
@@ -166,12 +167,19 @@ Zusätzlich zu den Datenpunkten gibt es `optolink/error` (`0`/`1`, siehe [Verbin
 | `AbgasTempOderRuecklauf` | 0x0808 | DPTemp | temp | Abgas- oder Rücklauftemperatur (unsicher) |
 | `boilerTemp` | 0x0810 | DPTemp | temp | Kesseltemperatur Tiefpass |
 | `LadespeicherObenTemp` | 0x0812 | DPTemp | temp | Speicher oben |
-| `LadespeicherUntenTemp` | 0x0814 | DPTemp | temp | Speicher unten |
+| `LadespeicherUntenRohTemp` | 0x0806 | DPTemp | temp | Speicher unten (ungefiltert) |
+| `LadespeicherUntenTemp` | 0x0814 | DPTemp | temp | Speicher unten Tiefpass |
 | `abgastemperaturTiefpass` | 0x0816 | DPTemp | temp | Abgastemperatur Tiefpass |
+| `Brennerstörung` | 0x0883 | DPMode | global | Brennerstörung |
+| `Brennerlaufzeit` | 0x0886 | DPHours | global | Brennerlaufzeit in Stunden |
+| `Brennerstarts` | 0x088A | DPCount | global | Brennerstarts |
+| `Umschaltventil` | 0x0A10 | DPMode | global | Umschaltventil (laut Original-Repo 0 = undefiniert, 1 = Heizen, 2 = Mittelstellung, 3 = Warmwasser) |
+| `Pumpendrehzahl` | 0x0A3C | DPMode | global | Solldrehzahl interne Pumpe in % |
+| `Sparbetrieb2` | 0x2302 | DPMode | global | Sparbetrieb A1M1 |
 | `raumtemperaturSoll` | 0x2306 | DPTempS | global | Raumtemperatur-Soll normal |
 | `redRaumtemperaturSoll` | 0x2307 | DPTempS | global | Raumtemperatur-Soll reduziert |
 | `partyTemperaturSoll` | 0x2308 | DPTempS | global | Party-Temperatur-Soll |
-| `ferienbetrieb2` | 0x2303 | DPMode | global | Ferienbetrieb |
+| `ferienbetrieb2` | 0x2303 | DPMode | global | Partybetrieb (Name historisch) |
 | `Betriebsart2` | 0x2323 | DPMode | global | Betriebsart |
 | `currentOperatingMode` | 0x2500 | DPMode | global | aktuelle Betriebsart A1M1 (0 = Standby, 1 = reduziert, 2/3 = normal) |
 | `ferienbetrieb` | 0x2535 | DPMode | global | Ferienbetrieb |
@@ -180,20 +188,42 @@ Zusätzlich zu den Datenpunkten gibt es `optolink/error` (`0`/`1`, siehe [Verbin
 | `heizkennlinieNiveau` | 0x27D4 | DPMode | global | Niveau der Heizkennlinie |
 | `x2900` | 0x2900 | DPTemp | global | Vorlauftemperatur-Ist? (unbekannt) |
 | `a1m1Pump` | 0x2906 | DPStat | global | Heizkreispumpe A1M1 |
-| `Betriebsart` | 0x3323 | DPMode | global | Betriebsart |
 | `aussenTemperaturTiefpass` | 0x5525 | DPTemp | temp | Außentemperatur Tiefpass |
 | `aussenTemperaturGedaempft` | 0x5527 | DPTemp | temp | Außentemperatur gedämpft |
 | `KesselSollTemp` | 0x555A | DPTemp | temp | Kessel-Soll |
+| `Flamme` | 0x55D3 | DPMode | global | Flamme (Bedeutung nicht bestätigt) |
 | `WarmwasserSollTemp` | 0x6300 | DPTempS | global | Warmwasser-Soll |
 | `Stoerungsmeldung1` | 0x7507 | DPRaw (9 Byte) | stoerung | neuester Eintrag der Fehlerhistorie |
-| `Stoerungsmeldung2` | 0x7510 | DPRaw (9 Byte) | stoerung | 2. Eintrag |
-| `Stoerungsmeldung3` | 0x7519 | DPRaw (9 Byte) | stoerung | 3. Eintrag |
+| `Stoerungsmeldung2` … `Stoerungsmeldung10` | 0x7510 … 0x7558 (Abstand 9) | DPRaw (9 Byte) | stoerung | 2. bis 10. Eintrag |
+| `Brennerleistung` | 0xA38F | DPPercent | global | aktuelle Brennerleistung in % |
 
-Weitere Adressen (Brennerstarts, Brennerlaufzeit, Störmeldungen 4–10 usw.) sind in
-[src/viessmann.cpp](src/viessmann.cpp) auskommentiert und lassen sich bei Bedarf aktivieren.
-Mit `//-// … // entfernt: <Grund>` markierte Datenpunkte wurden nach dem Datenpunkt-Scan entfernt, weil sie an
-dieser Anlage keine sinnvollen Werte liefern (Fehlwert, Ersatzwert ohne Fühler, Heizkreis M2 oder Solar nicht vorhanden).
-Ihre Topics werden nicht mehr gesendet; vorhandene Zustände in ioBroker bekommen keine neuen Werte.
+Mit `//-// … // entfernt: <Grund>` markierte Datenpunkte in [src/viessmann.cpp](src/viessmann.cpp) wurden nach dem
+Datenpunkt-Scan entfernt, weil sie an dieser Anlage keine sinnvollen Werte liefern (Fehlwert, Ersatzwert ohne Fühler,
+Heizkreis M2 oder Solar nicht vorhanden). Ihre Topics werden nicht mehr gesendet.
+
+`DPPercent` hat bis zu dieser Version 4 Bytes ausgewertet, obwohl der Datenpunkt nur 1 Byte lang ist. Ältere Werte von
+`Brennerleistung` (z. B. über 100 %) sind deshalb unzuverlässig.
+
+### Aufräumen in ioBroker
+
+[tools/iobroker/optolink-aufraeumen.js](tools/iobroker/optolink-aufraeumen.js) ist ein Skript für den
+javascript-Adapter. Es arbeitet in drei Schritten:
+
+1. **Veraltete Zustände löschen:** Es löscht unter `mqtt.0.optolink` alle Zustände, die die Firmware nicht mehr sendet.
+   Die Historie in InfluxDB bleibt erhalten.
+2. **Klarnamen setzen:** An den gesendeten Zuständen setzt es Klarname, Einheit, Rolle und Wertetexte. Die IDs bleiben
+   gleich.
+3. **Aliase anlegen:** Unter `alias.0.Heizung.<bereich>.<name>` legt es nur lesende Aliase an, z. B.
+   `alias.0.Heizung.kessel.temperatur`. Der Alias `heizkreis1.heizkennlinie_niveau` rechnet das Niveau mit Vorzeichen
+   um (247 → −9).
+
+Vorgehen:
+- Zuerst die Firmware einspielen und einen Zyklus abwarten.
+- Dann das Skript mit `PROBELAUF = true` starten und das Log prüfen.
+- Anschließend mit `false` starten.
+
+Die javascript-Instanz braucht dafür die Option „setObject erlauben“.
+`python -m unittest discover -s tools/iobroker` prüft, dass das Skript genau die Topics der Firmware kennt.
 Ein Datenpunkt wird gelesen, sobald er als globales Objekt definiert ist. Ohne eigenen Callback landet er
 automatisch beim globalen Callback.
 
